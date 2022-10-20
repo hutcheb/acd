@@ -1,5 +1,5 @@
 
-![ACD Tools](https://github.com/hutcheb/acd/actions/workflows/acd-tools/badge.svg)
+![ACD Tools](https://github.com/hutcheb/acd/actions/workflows/acd-tools.yml/badge.svg)
 
 ## Rockwell ACD Project File Tools
 
