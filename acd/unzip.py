@@ -10,21 +10,30 @@ class AcdHeader:
     f: BufferedReader
 
     def __post_init__(self):
-        self.f.seek(-16, 2)
-        self.preamble_len, self.record_offset, self.no_files, self._unknown_two = struct.unpack("IIII", self.f.read(16))
+        self.file_size = self.f.seek(-8, 2) + 8
+        self.no_files, self._unknown_two = struct.unpack("II", self.f.read(8))
+        self.record_offset = self.file_size - self.no_files * 528 - 8
         self.f.seek(0, 0)
 
 
 @dataclass
 class FileRecord:
     f: BufferedReader
-    start_offset: int
 
     def __post_init__(self):
-        self.f.seek(self.start_offset, 0)
-        filename_record = self.f.read(520)
-        filename_length = filename_record.find(b'\x00\x00')
-        self.filename = filename_record[:filename_length + 1].decode('utf-16-le')
+        end_found = False
+        byte_array = b''
+        count = 0
+        while not end_found:
+            b = self.f.read(2)
+            if b == b'\x00\x00':
+                end_found = True
+            else:
+                byte_array += b
+        filename_length = len(byte_array)
+        self.filename = byte_array.decode('utf-16-le')
+        self.f.seek(520 - filename_length - 2, 1)
+        self.file_length, self.file_offset = struct.unpack("II", self.f.read(8))
         pass
 
 
@@ -48,10 +57,9 @@ class Unzip:
 
     def _read_records(self, f: BufferedReader):
         f.seek(self.header.record_offset)
-        self._preamble = f.read(self.header.preamble_len)
         self.records = []
         for i in range(0, self.header.no_files):
-            self.records.append(FileRecord(f, self.header.record_offset + self.header.preamble_len))
+            self.records.append(FileRecord(f))
 
     def _read(self):
         with open(self._filename, 'rb') as f:

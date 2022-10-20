@@ -17,9 +17,6 @@ def test_file_count(sample_acd):
 
 
 def test_header_offset(sample_acd):
-    assert 2027516 == sample_acd.header.record_offset
+    assert 2027550 == sample_acd.header.record_offset
 
-
-def test_preamble_length(sample_acd):
-    assert 34 == sample_acd.header.preamble_len
 
