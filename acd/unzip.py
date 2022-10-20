@@ -7,6 +7,7 @@ from io import BufferedReader
 from pathlib import Path
 from loguru import logger as log
 
+
 @dataclass
 class AcdHeader:
     f: BufferedReader
@@ -29,17 +30,16 @@ class FileRecord:
 
     def _read_filename(self):
         end_found = False
-        byte_array = b''
-        count = 0
+        byte_array = b""
         while not end_found:
             b = self.f.read(2)
-            if b == b'\x00\x00':
+            if b == b"\x00\x00":
                 end_found = True
             else:
                 byte_array += b
         filename_length = len(byte_array)
         self.f.seek(520 - filename_length - 2, 1)
-        self.filename = byte_array.decode('utf-16-le')
+        self.filename = byte_array.decode("utf-16-le")
 
 
 @dataclass
@@ -52,7 +52,7 @@ class Unzip:
 
     def _read_magic_number(self, f: BufferedReader):
         magicBytes = binascii.hexlify(f.read(2))
-        if magicBytes != b'0d0a':
+        if magicBytes != b"0d0a":
             log.debug("")
             raise RuntimeError("File isn't a Rockwell ACD file")
         f.seek(0, 0)
@@ -67,17 +67,18 @@ class Unzip:
             self.records.append(FileRecord(f))
 
     def write_files(self, directory: Path):
-        with open(self._filename, 'rb') as f:
+        directory.mkdir(parents=True, exist_ok=True)
+        with open(self._filename, "rb") as f:
             for record in self.records:
                 f.seek(record.file_offset)
-                with open(os.path.join(directory, record.filename), 'wb') as out_file:
+                with open(os.path.join(directory, record.filename), "wb") as out_file:
                     if record.filename[-3:] == "XML":
                         out_file.write(gzip.decompress(f.read(record.file_length)))
                     else:
                         out_file.write(f.read(record.file_length))
 
     def _read(self):
-        with open(self._filename, 'rb') as f:
+        with open(self._filename, "rb") as f:
             # Check the file's magic number to confirm an ACD file
             self._read_magic_number(f)
             self._read_file_header(f)
