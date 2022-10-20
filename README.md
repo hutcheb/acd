@@ -1,4 +1,6 @@
 
+https://github.com/hutcheb/acd/actions/workflows/acd-tools/badge.svg
+
 ## Rockwell ACD Project File Tools
 
 The Rockwell ACD file is an archive file that contains all the files 
