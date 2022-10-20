@@ -19,4 +19,3 @@ from acd.unzip import Unzip
 unzip = Unzip('CuteLogix.ACD')
 unzip.write_files('output_directory')
 ```
-
