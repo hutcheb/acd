@@ -1,4 +1,6 @@
 import binascii
+import gzip
+import os
 import struct
 from dataclasses import dataclass, InitVar
 from io import BufferedReader
@@ -21,6 +23,11 @@ class FileRecord:
     f: BufferedReader
 
     def __post_init__(self):
+        self._read_filename()
+        self.file_length, self.file_offset = struct.unpack("II", self.f.read(8))
+        pass
+
+    def _read_filename(self):
         end_found = False
         byte_array = b''
         count = 0
@@ -31,10 +38,8 @@ class FileRecord:
             else:
                 byte_array += b
         filename_length = len(byte_array)
-        self.filename = byte_array.decode('utf-16-le')
         self.f.seek(520 - filename_length - 2, 1)
-        self.file_length, self.file_offset = struct.unpack("II", self.f.read(8))
-        pass
+        self.filename = byte_array.decode('utf-16-le')
 
 
 @dataclass
@@ -61,17 +66,19 @@ class Unzip:
         for i in range(0, self.header.no_files):
             self.records.append(FileRecord(f))
 
+    def write_files(self, directory: Path):
+        with open(self._filename, 'rb') as f:
+            for record in self.records:
+                f.seek(record.file_offset)
+                with open(os.path.join(directory, record.filename), 'wb') as out_file:
+                    if record.filename[-3:] == "XML":
+                        out_file.write(gzip.decompress(f.read(record.file_length)))
+                    else:
+                        out_file.write(f.read(record.file_length))
+
     def _read(self):
         with open(self._filename, 'rb') as f:
             # Check the file's magic number to confirm an ACD file
             self._read_magic_number(f)
             self._read_file_header(f)
             self._read_records(f)
-
-
-    def get_number_of_files(self) -> int:
-        return self.header.no_files
-
-    def get_file_header_offset(self):
-        return self.header.record_offset
-
