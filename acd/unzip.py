@@ -26,12 +26,12 @@ class FileRecord:
     def __post_init__(self):
         self._read_filename()
         self.file_length, self.file_offset = struct.unpack("II", self.f.read(8))
-        pass
 
     def _read_filename(self):
         end_found = False
         byte_array = b""
         while not end_found:
+            # Keep reading until a null character is found
             b = self.f.read(2)
             if b == b"\x00\x00":
                 end_found = True
@@ -50,7 +50,23 @@ class Unzip:
         self._filename = Path(filename)
         self._read()
 
+    def write_files(self, directory: Path):
+        directory.mkdir(parents=True, exist_ok=True)
+        with open(self._filename, "rb") as f:
+            for record in self.records:
+                f.seek(record.file_offset)
+                with open(os.path.join(directory, record.filename), "wb") as out_file:
+                    if f.read(2) == b"\x1f\x8b":
+                        f.seek(record.file_offset)
+                        # Uncompress the files with gzip compression, the magic number is handy here.
+                        out_file.write(gzip.decompress(f.read(record.file_length)))
+                    else:
+                        f.seek(record.file_offset)
+                        out_file.write(f.read(record.file_length))
+
     def _read_magic_number(self, f: BufferedReader):
+        # Magic number is just the start of the first file in the archive
+        # Even so it is a handy indicator
         magicBytes = binascii.hexlify(f.read(2))
         if magicBytes != b"0d0a":
             log.debug("")
@@ -65,17 +81,6 @@ class Unzip:
         self.records = []
         for i in range(0, self.header.no_files):
             self.records.append(FileRecord(f))
-
-    def write_files(self, directory: Path):
-        directory.mkdir(parents=True, exist_ok=True)
-        with open(self._filename, "rb") as f:
-            for record in self.records:
-                f.seek(record.file_offset)
-                with open(os.path.join(directory, record.filename), "wb") as out_file:
-                    if record.filename[-3:] == "XML":
-                        out_file.write(gzip.decompress(f.read(record.file_length)))
-                    else:
-                        out_file.write(f.read(record.file_length))
 
     def _read(self):
         with open(self._filename, "rb") as f:
