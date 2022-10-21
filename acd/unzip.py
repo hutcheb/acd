@@ -1,11 +1,9 @@
-import binascii
 import gzip
 import os
 import struct
 from dataclasses import dataclass, InitVar
 from io import BufferedReader
 from pathlib import Path
-from loguru import logger as log
 
 
 @dataclass
@@ -67,9 +65,8 @@ class Unzip:
     def _read_magic_number(self, f: BufferedReader):
         # Magic number is just the start of the first file in the archive
         # Even so it is a handy indicator
-        magicBytes = binascii.hexlify(f.read(2))
-        if magicBytes != b"0d0a":
-            log.debug("")
+        magicBytes = f.read(2)
+        if magicBytes != b"\x0d\x0a":
             raise RuntimeError("File isn't a Rockwell ACD file")
         f.seek(0, 0)
 
