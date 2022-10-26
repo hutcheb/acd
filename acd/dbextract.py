@@ -115,7 +115,6 @@ class DbExtract:
                 bffb += 1
             if self.records[i].identifier == "":
                 break
-        log.debug("f")
 
     def write_records_to_file(self, directory):
         path = Path(directory)
@@ -129,14 +128,13 @@ class DbExtract:
                     + "-"
                     + self.records[i].identifier
                     + "-"
-                    + self.records[i].text_identifier,
+                    + self.records[i].text_identifier.replace(":", "_"),
                 ),
                 "wb+",
             ) as out_file:
                 log.debug("Write file - " + str(i) + "-" + self.records[i].identifier)
                 out_file.write(self.records[i].record)
                 out_file.flush()
-                out_file.close()
 
     def _read(self):
         with open(self._filename, "rb") as f:
