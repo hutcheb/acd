@@ -118,12 +118,13 @@ class DbExtract:
         log.debug("f")
 
     def write_records_to_file(self, directory):
-        Path(directory).mkdir(parents=True, exist_ok=True)
+        path = Path(directory)
+        path.mkdir(parents=True, exist_ok=True)
         for i in range(0, len(self.records)):
             self.records[i].text_identifier
             with open(
                 os.path.join(
-                    directory,
+                    path,
                     str(i)
                     + "-"
                     + self.records[i].identifier
