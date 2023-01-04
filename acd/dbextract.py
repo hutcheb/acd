@@ -1,9 +1,7 @@
-import os
 import struct
 from dataclasses import dataclass, InitVar
 from io import BufferedReader
 from pathlib import Path
-from loguru import logger as log
 
 
 @dataclass
@@ -43,43 +41,11 @@ class DatRecord:
     f: BufferedReader
 
     def __post_init__(self):
-        identifier: bytes = self.f.read(2)
-        self.identifier = ""
-        self.text_identifier = ""
+        self.identifier: bytes = self.f.read(2)
         self.record: bytes = bytearray()
-        if identifier == b"\xfa\xfa":
-            self.identifier = "FAFA"
-        elif identifier == b"\xfd\xfd":
-            self.identifier = "FDFD"
-        elif identifier == b"\xbf\xfb":
-            self.identifier = "BFFB"
-        if self.identifier == "":
-            self.f.tell()
-        else:
-            self.record_length, self.remaining_bytes = struct.unpack(
-                "II", self.f.read(8)
-            )
 
-            if self.identifier == "FAFA" or self.identifier == "FDFD":
-                pos = self.f.tell()
-                self.f.seek(12, 1)
-                (self.id, self.type_field) = struct.unpack("II", self.f.read(8))
-                self._read_text_identifier()
-                self.f.seek(pos)
-
-            self.record: bytes = self.f.read(self.record_length - 10)
-
-    def _read_text_identifier(self):
-        end_found = False
-        byte_array = b""
-        while not end_found:
-            # Keep reading until a null character is found
-            b = self.f.read(2)
-            if b == b"\x00\x00":
-                end_found = True
-            else:
-                byte_array += b
-        self.text_identifier = byte_array.decode("utf-16-le")
+        self.record_length, self.remaining_bytes = struct.unpack("II", self.f.read(8))
+        self.record: bytes = self.f.read(self.record_length - 10)
 
 
 @dataclass
@@ -101,40 +67,9 @@ class DbExtract:
     def _read_records(self, f: BufferedReader):
         self.records = []
         f.seek(self.header.start_records_position)
-        fafa = 0
-        fdfd = 0
-        bffb = 0
 
-        for i in range(0, self.header.no_records + 1000):
+        for i in range(0, self.header.no_records):
             self.records.append(DatRecord(f))
-            if self.records[i].identifier == "FAFA":
-                fafa += 1
-            elif self.records[i].identifier == "FDFD":
-                fdfd += 1
-            elif self.records[i].identifier == "BFFB":
-                bffb += 1
-            if self.records[i].identifier == "":
-                break
-
-    def write_records_to_file(self, directory):
-        path = Path(directory)
-        path.mkdir(parents=True, exist_ok=True)
-        for i in range(0, len(self.records)):
-            self.records[i].text_identifier
-            with open(
-                os.path.join(
-                    path,
-                    str(i)
-                    + "-"
-                    + self.records[i].identifier
-                    + "-"
-                    + self.records[i].text_identifier.replace(":", "_"),
-                ),
-                "wb+",
-            ) as out_file:
-                log.debug("Write file - " + str(i) + "-" + self.records[i].identifier)
-                out_file.write(self.records[i].record)
-                out_file.flush()
 
     def _read(self):
         with open(self._filename, "rb") as f:
@@ -142,4 +77,3 @@ class DbExtract:
             self._read_magic_number(f)
             self._read_header(f)
             self._read_records(f)
-            self.write_records_to_file("build/comps_records")

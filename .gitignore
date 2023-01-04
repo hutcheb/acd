@@ -7,3 +7,4 @@ acd.egg-info
 venv
 build
 .idea
+dist
