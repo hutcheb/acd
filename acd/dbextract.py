@@ -29,7 +29,11 @@ class DatHeader:
         self.f.seek(self.pointer_records_region)
         if self.f.read(2) != b"\xfe\xfe":
             raise RuntimeError("Record Region Incorrect")
-        self.record_header_length = struct.unpack("I", self.f.read(4))[0]
+        self.record_header_length, self._unknown4, self.unknown5, self.record_format = struct.unpack("IIII", self.f.read(16))
+        if self.record_format == 132:
+            raise RuntimeError("Cross Reference Databases Not Supported")
+        elif self.record_format != 512:
+            raise RuntimeError("Unknown record format")
         self.start_records_position = (
             self.pointer_records_region + self.record_header_length
         )

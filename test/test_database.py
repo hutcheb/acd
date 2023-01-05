@@ -27,9 +27,21 @@ def test_header(sample_acd, sbregion_dat):
     assert sbregion_dat.header.pointer_records_region == 2591
 
 
-def test_parse_sbregion_dat(sample_acd, sbregion_dat):
-    db: DbExtract = DbExtract("build/SbRegion.Dat")
+def test_parse_sbregion_dat(sbregion_dat):
     records: List[SbRegionRecord] = []
-    for record in db.records:
+    for record in sbregion_dat.records:
         records.append(SbRegionRecord(record))
     assert records[-1].text == "LOWER(@f060d7ef@[6],@f060d7ef@[7]);"
+
+
+def test_parse_comments_dat():
+    db: DbExtract = DbExtract("build/Comments.Dat")
+
+
+def test_parse_comps_dat():
+    db: DbExtract = DbExtract("build/Comps.Dat")
+
+
+def test_parse_nameless_dat():
+    db: DbExtract = DbExtract("build/Nameless.Dat")
+
