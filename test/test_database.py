@@ -11,24 +11,24 @@ from acd.unzip import Unzip
 
 @pytest.fixture()
 async def sample_acd():
-    unzip = Unzip("resources/CuteLogix.ACD").write_files("build")
+    unzip = Unzip("../resources/CuteLogix.ACD").write_files("build")
     yield unzip
 
 
 @pytest.fixture()
 async def sbregion_dat():
-    db = DbExtract("test/build/SbRegion.Dat")
+    db = DbExtract("build/SbRegion.Dat")
     yield db
 
 
 @pytest.fixture()
 async def comps_dat():
-    db = DbExtract("test/build/Comps.Dat")
+    db = DbExtract("build/Comps.Dat")
     yield db
 
 @pytest.fixture()
 async def controller():
-    yield ExportL5x("resources/CuteLogix.ACD", "test/build/output.txt").controller
+    yield ExportL5x("../resources/CuteLogix.ACD", "build/output.txt").controller
 
 
 def test_open_file(sample_acd, sbregion_dat):
@@ -58,8 +58,8 @@ def test_parse_tags_dat(controller):
     assert tag_name == 'Toggle'
 
 def test_parse_comments_dat():
-    db: DbExtract = DbExtract("test/build/Comments.Dat")
+    db: DbExtract = DbExtract("build/Comments.Dat")
 
 
 def test_parse_nameless_dat():
-    db: DbExtract = DbExtract("test/build/Nameless.Dat")
+    db: DbExtract = DbExtract("build/Nameless.Dat")
