@@ -5,7 +5,7 @@ from acd.unzip import Unzip
 
 @pytest.fixture()
 async def sample_acd():
-    unzip = Unzip("../resources/CuteLogix.ACD")
+    unzip = Unzip("resources/CuteLogix.ACD")
     yield unzip
 
 

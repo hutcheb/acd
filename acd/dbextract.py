@@ -15,7 +15,8 @@ class DatHeader:
             self.region_pointer_offset,
             self._unknown1,
             self.no_records,
-        ) = struct.unpack("IIII", self.f.read(16))
+            self.no_records_table2,
+        ) = struct.unpack("IIIII", self.f.read(20))
         self.f.seek(self.region_pointer_offset)
         if self.f.read(2) != b"\xfe\xfe":
             raise RuntimeError("Pointer Region Incorrect")
@@ -48,8 +49,8 @@ class DatRecord:
         self.identifier: bytes = self.f.read(2)
         self.record: bytes = bytearray()
 
-        self.record_length, self.remaining_bytes = struct.unpack("II", self.f.read(8))
-        self.record: bytes = self.f.read(self.record_length - 10)
+        self.record_length = struct.unpack("I", self.f.read(4))[0]
+        self.record: bytes = self.f.read(self.record_length - 6)
 
 
 @dataclass
@@ -72,7 +73,7 @@ class DbExtract:
         self.records = []
         f.seek(self.header.start_records_position)
 
-        for i in range(0, self.header.no_records):
+        for i in range(0, self.header.no_records + self.header.no_records_table2):
             self.records.append(DatRecord(f))
 
     def _read(self):

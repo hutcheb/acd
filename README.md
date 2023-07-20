@@ -9,9 +9,25 @@ that are used by RSLogix/Studio 5000.
 It consists of a number of text files containing version information, compressed XML
 files containing project and tag information as well as a number of database files.
 
+### Parsing the ACD file
+
+The exporting of the L5X file isn't complete, we are able to parse the data types, tags and programs into a Controller
+python object though.
+
+To get the Controller object and get the program/routines/rungs/tags/datatypes, use something like this
+```python
+from acd.export_l5x import ExportL5x
+
+controller = ExportL5x("../resources/CuteLogix.ACD", "build/output.l5x").controller
+rung = controller.programs[0].routines[0].rungs[0]
+data_type = controller.data_types[-1]
+tag_name = controller.tags[75].text
+tag_data_type =  controller.tags[75].data_type
+```
+
 ### Unzip
 
-To extract the file use the acd.unzip.Unzip class
+To extract the file use the acd.unzip.Unzip class. This extracts the database files to a directory.
 
 ```python
 from acd.unzip import Unzip
@@ -20,38 +36,5 @@ unzip = Unzip('CuteLogix.ACD')
 unzip.write_files('output_directory')
 ```
 
-### Extract Database
 
-Extracting the records from a database file is still a work in progress. However,
-there is some consistencies across the database files.
 
-To read each of the records and store them in a byte array use the DbExtract function
-
-```python
-db = DbExtract("build/SbRegion.Dat")
-```
-
-### Extract SbRegion
-
-The SbRegion file seems to be fairly basic, to then parse each record from a DbExtract
-use code similar to that below.
-
-```python
-db: DbExtract = DbExtract("build/SbRegion.Dat")
-records: List[SbRegionRecord] = []
-for record in db.records:
-    records.append(SbRegionRecord(record))
-```
-
-You can then read the string format for each rung. I haven't seen anything other than 
-rungs yet, but hopefully they are stored in a similar format.
-
-```python
-records[0].text 
-```
-will contain something like
-
-```
-LOWER(@f060d7ef@[6],@f060d7ef@[7]);
-```
-The tag references are stored in another database.
