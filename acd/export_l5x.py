@@ -21,8 +21,8 @@ class ExportL5x:
 
     def __post_init__(self):
         self._temp_dir = tempfile.mkdtemp()
-        #os.remove("acd.db")
-        self._db = sqlite3.connect(os.path.join(self._temp_dir, "acd.db"))
+        os.remove("acd.db")
+        self._db = sqlite3.connect(os.path.join("acd.db"))
         self._cur: Cursor = self._db.cursor()
         self._cur.execute("CREATE TABLE comps(object_id int, parent_id int, comp_name text, seq_number int, record_type int, record BLOB NOT NULL)")
         self._cur.execute("CREATE TABLE pointers(object_id int, parent_id int, comp_name text, seq_number int, record_type int, record BLOB NOT NULL)")

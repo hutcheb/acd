@@ -48,9 +48,25 @@ class Tag(L5xElement):
 
         record = results[0][3]
 
-        array_length_offest = 215
-        self.array_length = struct.unpack(
-            "B", record[array_length_offest: array_length_offest + 1]
+        hidden_offset = 8
+        if struct.unpack(
+            "H", record[hidden_offset: hidden_offset + 2]
+        )[0] == 256:
+            self.hidden = True
+
+        one_dim_array_length_offest = 174
+        self.one_dim_array_length = struct.unpack(
+            "I", record[one_dim_array_length_offest: one_dim_array_length_offest + 4]
+        )[0]
+
+        two_dim_array_length_offest = 178
+        self.two_dim_array_length = struct.unpack(
+            "I", record[two_dim_array_length_offest: two_dim_array_length_offest + 4]
+        )[0]
+
+        three_dim_array_length_offest = 182
+        self.three_dim_array_length = struct.unpack(
+            "I", record[three_dim_array_length_offest: three_dim_array_length_offest + 4]
         )[0]
 
         data_type_offest = 190
@@ -68,8 +84,12 @@ class Tag(L5xElement):
 
             self.data_type = data_type_results[0][0]
 
-        if  self.array_length != 0:
-            self.data_type = self.data_type + "[" + str(self.array_length) + "]"
+        if  self.one_dim_array_length != 0:
+            self.data_type = self.data_type + "[" + str(self.one_dim_array_length) + "]"
+        if  self.two_dim_array_length != 0:
+            self.data_type = self.data_type + "[" + str(self.two_dim_array_length) + "]"
+        if  self.three_dim_array_length != 0:
+            self.data_type = self.data_type + "[" + str(self.three_dim_array_length) + "]"
 
         comment_length_offset = 238
         comment_length = struct.unpack(
@@ -139,7 +159,7 @@ class Program(L5xElement):
         for child in routine_results:
             self.routines.append(Routine(self._cur, child[1]))
 
-        pass
+
 
 
 
