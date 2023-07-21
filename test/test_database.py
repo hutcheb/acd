@@ -26,8 +26,8 @@ async def comps_dat():
     db = DbExtract("build/Comps.Dat")
     yield db
 
-@pytest.fixture()
-async def controller():
+@pytest.fixture(scope = "module")
+def controller():
     yield ExportL5x("../resources/CuteLogix.ACD", "build/output.txt").controller
 
 
