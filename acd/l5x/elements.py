@@ -49,10 +49,9 @@ class Tag(L5xElement):
         record = results[0][3]
 
         hidden_offset = 8
-        if struct.unpack(
+        self.hidden = struct.unpack(
             "H", record[hidden_offset: hidden_offset + 2]
-        )[0] == 256:
-            self.hidden = True
+        )[0] == 256
 
         one_dim_array_length_offest = 174
         self.one_dim_array_length = struct.unpack(
@@ -159,8 +158,21 @@ class Program(L5xElement):
         for child in routine_results:
             self.routines.append(Routine(self._cur, child[1]))
 
+        # Get the Program Scoped Tags
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
+                self._object_id) + " AND comp_name='RxTagCollection'")
+        results = self._cur.fetchall()
+        if len(results) > 1:
+            raise Exception("Contains more than one program tag collection")
 
-
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
+                results[0][1]))
+        results = self._cur.fetchall()
+        self.tags: List[Tag] = []
+        for result in results:
+            self.tags.append(Tag(self._cur, result[1]))
 
 
 @dataclass
