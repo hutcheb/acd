@@ -24,6 +24,8 @@ class ExportL5x:
         log.info("Creating temporary directory (if it doesn't exist to store ACD database files - " + self._temp_dir)
         if os.path.exists(os.path.join(self._temp_dir, "acd.db")):
             os.remove(os.path.join(self._temp_dir, "acd.db"))
+        if not os.path.exists(os.path.join(self._temp_dir)):
+            os.makedirs(self._temp_dir)
         log.info("Creating sqllite database to store ACD database records")
         self._db = sqlite3.connect(os.path.join(self._temp_dir, "acd.db"))
         self._cur: Cursor = self._db.cursor()
