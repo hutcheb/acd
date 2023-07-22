@@ -13,7 +13,7 @@ from loguru import logger as log
 
 @pytest.fixture()
 async def sample_acd():
-    unzip = Unzip("../resources/pylogix.ACD").write_files("build")
+    unzip = Unzip("../resources/CuteLogix.ACD").write_files("build")
     yield unzip
 
 
