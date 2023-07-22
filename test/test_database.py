@@ -8,10 +8,12 @@ from acd.export_l5x import ExportL5x
 from acd.sbregion import SbRegionRecord
 from acd.unzip import Unzip
 
+from loguru import logger as log
+
 
 @pytest.fixture()
 async def sample_acd():
-    unzip = Unzip("../resources/CuteLogix.ACD").write_files("build")
+    unzip = Unzip("../resources/pylogix.ACD").write_files("build")
     yield unzip
 
 
@@ -28,7 +30,8 @@ async def comps_dat():
 
 @pytest.fixture(scope = "module")
 def controller():
-    yield ExportL5x("../resources/CuteLogix.ACD", "build/output.txt").controller
+    log.level("DEBUG")
+    yield ExportL5x("../resources/CuteLogix.ACD", "build/output.txt", "build").controller
 
 
 def test_open_file(sample_acd, sbregion_dat):

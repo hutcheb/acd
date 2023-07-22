@@ -1,10 +1,9 @@
 import argparse
 import os
-import re
 import sqlite3
 import struct
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from sqlite3 import Cursor
 
 from acd.comps import CompsRecord
@@ -13,36 +12,52 @@ from acd.l5x.elements import Controller
 from acd.sbregion import SbRegionRecord
 from acd.unzip import Unzip
 
+from loguru import logger as log
 
 @dataclass
 class ExportL5x:
     input_filename: str
     output_filename: str
+    _temp_dir: str = tempfile.mkdtemp()
 
     def __post_init__(self):
-        self._temp_dir = tempfile.mkdtemp()
-        #os.remove("acd.db")
+        log.info("Creating temporary directory (if it doesn't exist to store ACD database files - " + self._temp_dir)
+        if os.path.exists(os.path.join(self._temp_dir, "acd.db")):
+            os.remove(os.path.join(self._temp_dir, "acd.db"))
+        log.info("Creating sqllite database to store ACD database records")
         self._db = sqlite3.connect(os.path.join(self._temp_dir, "acd.db"))
         self._cur: Cursor = self._db.cursor()
+
+        log.debug("Create Comps table in sqllite db")
         self._cur.execute("CREATE TABLE comps(object_id int, parent_id int, comp_name text, seq_number int, record_type int, record BLOB NOT NULL)")
+        log.debug("Create pointers table in sqllite db")
         self._cur.execute("CREATE TABLE pointers(object_id int, parent_id int, comp_name text, seq_number int, record_type int, record BLOB NOT NULL)")
+        log.debug("Create Rungs table in sqllite db")
         self._cur.execute("CREATE TABLE rungs(object_id int, rung text, seq_number int)")
+        log.debug("Create Region_map table in sqllite db")
         self._cur.execute("CREATE TABLE region_map(object_id int, parent_id int)")
+
+        log.info("Extracting ACD database file")
         unzip = Unzip(self.input_filename)
         unzip.write_files(self._temp_dir)
+
+        log.info("Getting records from ACD Comps file and storing in sqllite database")
         comps_db = DbExtract(os.path.join(self._temp_dir, "Comps.Dat"))
 
         for record in comps_db.records:
             CompsRecord(self._cur, record)
-            self._db.commit()
+        self._db.commit()
 
+        log.info("Getting records from ACD Region Map file and storing in sqllite database")
         self.populate_region_map()
 
+        log.info("Getting records from ACD SbRegion file and storing in sqllite database")
         sb_region_db = DbExtract(os.path.join(self._temp_dir, "SbRegion.Dat"))
         for record in sb_region_db.records:
             SbRegionRecord(self._cur, record)
             self._db.commit()
 
+        log.info("Creating Python Controller Object")
         self.controller = Controller(self._cur)
 
 
