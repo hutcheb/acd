@@ -23,7 +23,7 @@ class SbRegionRecord:
                 "I", self.dat_record.record[identifier_offset : identifier_offset + 4]
             )[0]
             language_type_record_length: int = 29
-            language_type_offset: int = 12
+            language_type_offset: int = 10
             self.language_type = (
                 self.dat_record.record[
                     language_type_offset : language_type_offset
@@ -36,15 +36,19 @@ class SbRegionRecord:
             self.record_length = struct.unpack(
                 "I", self.dat_record.record[record_length_offset : record_length_offset + 4]
             )[0]
-            record_offset = 55
-            self.text = self.dat_record.record[
-                record_offset : record_offset + self.record_length - 2
-            ].decode("utf-16-le")
 
-            self.text = self.replace_tag_references(self.text)
+            if self.language_type == "Rung NT":
+                record_offset = 55
+                self.text = self.dat_record.record[
+                    record_offset : record_offset + self.record_length - 2
+                ].decode("utf-16-le")
 
-            query: str = "INSERT INTO rungs VALUES ('" + str(self.identifier) + "', '" + self.text + "', '')"
-            self._cur.execute(query)
+                self.text = self.replace_tag_references(self.text)
+
+                query: str = "INSERT INTO rungs VALUES ('" + str(self.identifier) + "', '" + self.text + "', '')"
+                self._cur.execute(query)
+            elif self.language_type == "REGION AST":
+                pass
 
     def replace_tag_references(self, sb_rec):
         m = re.findall("@[A-Za-z0-9]*@", sb_rec)

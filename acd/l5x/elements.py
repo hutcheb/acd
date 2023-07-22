@@ -26,15 +26,16 @@ class DataType(L5xElement):
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
                 self._object_id))
         member_results = self._cur.fetchall()
-        member_collection_id = member_results[0][1]
+        if len(member_results) == 1:
+            member_collection_id = member_results[0][1]
 
-        self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
-                member_collection_id))
-        children_results = self._cur.fetchall()
-        self.children = []
-        for child in children_results:
-            self.children.append(child[0])
+            self._cur.execute(
+                "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
+                    member_collection_id))
+            children_results = self._cur.fetchall()
+            self.children = []
+            for child in children_results:
+                self.children.append(child[0])
 
 
 @dataclass
