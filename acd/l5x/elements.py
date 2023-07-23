@@ -48,6 +48,7 @@ class Tag(L5xElement):
         results = self._cur.fetchall()
 
         record = results[0][3]
+        self.text = results[0][0]
 
         hidden_offset = 8
         self.hidden = struct.unpack(
@@ -91,18 +92,7 @@ class Tag(L5xElement):
         if  self.three_dim_array_length != 0:
             self.data_type = self.data_type + "[" + str(self.three_dim_array_length) + "]"
 
-        comment_length_offset = 238
-        comment_length = struct.unpack(
-            "B", record[comment_length_offset: comment_length_offset + 1]
-        )[0]
 
-        comment_start_offset = 240
-        if comment_length > 0:
-            self.text = record[
-                        comment_start_offset: comment_start_offset + comment_length
-                        ].decode("ascii")
-        else:
-            self.text = ""
 
 
 @dataclass
@@ -131,6 +121,50 @@ class Routine(L5xElement):
             if len(rungs_results) > 0:
                 self.rungs.append(rungs_results[0][1])
         pass
+
+@dataclass
+class AOI(L5xElement):
+
+    def __post_init__(self):
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
+                self._object_id))
+        results = self._cur.fetchall()
+
+        record = results[0][3]
+        self.name = results[0][0]
+
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
+                self._object_id) + " AND comp_name='RxRoutineCollection'")
+        collection_results = self._cur.fetchall()
+        collection_id = collection_results[0][1]
+
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
+                collection_id))
+        routine_results = self._cur.fetchall()
+
+        self.routines = []
+        for child in routine_results:
+            self.routines.append(Routine(self._cur, child[1]))
+
+        # Get the Program Scoped Tags
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
+                self._object_id) + " AND comp_name='RxTagCollection'")
+        results = self._cur.fetchall()
+        if len(results) > 1:
+            raise Exception("Contains more than one program tag collection")
+
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
+                results[0][1]))
+        results = self._cur.fetchall()
+        self.tags: List[Tag] = []
+        for result in results:
+            self.tags.append(Tag(self._cur, result[1]))
+
 
 @dataclass
 class Program(L5xElement):
@@ -235,3 +269,19 @@ class Controller(L5xElement):
         self.programs: List[Program] = []
         for result in results:
             self.programs.append(Program(self._cur, result[1]))
+
+        # Get the AOI Collection and get the AOIs
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
+                self._object_id) + " AND comp_name='RxUDIDefinitionCollection'")
+        results = self._cur.fetchall()
+        if len(results) > 1:
+            raise Exception("Contains more than one AOI collection")
+
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
+                results[0][1]))
+        results = self._cur.fetchall()
+        self.aois: List[Program] = []
+        for result in results:
+            self.aois.append(AOI(self._cur, result[1]))

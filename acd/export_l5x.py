@@ -75,25 +75,28 @@ class ExportL5x:
             "I", record[identifier_offset: identifier_offset + 4]
         )[0]
 
-        while record_identifier == 4294967295:
-            record_identifier = struct.unpack(
+        region_length = struct.unpack(
+            "I", record[identifier_offset + 4: identifier_offset + 8]
+        )[0]
+
+        identifier_offset = 226
+        record_length_absolute = identifier_offset + region_length
+
+        while identifier_offset < record_length_absolute:
+            parent_id_identifier = struct.unpack(
                 "I", record[identifier_offset: identifier_offset + 4]
             )[0]
 
             object_id_identifier = struct.unpack(
-                "I", record[identifier_offset + 4: identifier_offset + 8]
-            )[0]
-
-            parent_id_identifier = struct.unpack(
-                "I", record[identifier_offset + 8: identifier_offset + 12]
+                "I", record[identifier_offset + 12: identifier_offset + 16]
             )[0]
 
             identifier_offset += 16
 
-            if record_identifier == 4294967295:
-                query: str = "INSERT INTO region_map VALUES (?, ?)"
-                enty: tuple = (object_id_identifier, parent_id_identifier)
-                self._cur.execute(query, enty)
+            query: str = "INSERT INTO region_map VALUES (?, ?)"
+            enty: tuple = (object_id_identifier, parent_id_identifier)
+            self._cur.execute(query, enty)
+            pass
 
         self._db.commit()
 
