@@ -107,10 +107,9 @@ class Routine(L5xElement):
         record = results[0][3]
         self.name = results[0][0]
 
-        #TODO:- Query the RegionMap for the list of rungs
         self._cur.execute(
-            "SELECT object_id, parent_id FROM region_map WHERE parent_id=" + str(
-                self._object_id))
+            "SELECT object_id, parent_id, seq_no FROM region_map WHERE parent_id=" + str(
+                self._object_id) +  " ORDER BY seq_no")
         results = self._cur.fetchall()
         self.rungs = []
         for member in results:

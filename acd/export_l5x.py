@@ -37,7 +37,7 @@ class ExportL5x:
         log.debug("Create Rungs table in sqllite db")
         self._cur.execute("CREATE TABLE rungs(object_id int, rung text, seq_number int)")
         log.debug("Create Region_map table in sqllite db")
-        self._cur.execute("CREATE TABLE region_map(object_id int, parent_id int)")
+        self._cur.execute("CREATE TABLE region_map(object_id int, parent_id int, unknown int, seq_no int, record BLOB NOT NULL)")
 
         log.info("Extracting ACD database file")
         unzip = Unzip(self.input_filename)
@@ -87,16 +87,22 @@ class ExportL5x:
                 "I", record[identifier_offset: identifier_offset + 4]
             )[0]
 
+            unknown_identifier = struct.unpack(
+                "I", record[identifier_offset + 4: identifier_offset + 8]
+            )[0]
+
+            seq_identifier = struct.unpack(
+                "I", record[identifier_offset + 8: identifier_offset + 12]
+            )[0]
+
             object_id_identifier = struct.unpack(
                 "I", record[identifier_offset + 12: identifier_offset + 16]
             )[0]
 
-            identifier_offset += 16
-
-            query: str = "INSERT INTO region_map VALUES (?, ?)"
-            enty: tuple = (object_id_identifier, parent_id_identifier)
+            query: str = "INSERT INTO region_map VALUES (?, ?, ?, ?, ?)"
+            enty: tuple = (object_id_identifier, parent_id_identifier, unknown_identifier, seq_identifier, record[identifier_offset: identifier_offset + 16])
             self._cur.execute(query, enty)
-            pass
+            identifier_offset += 16
 
         self._db.commit()
 
