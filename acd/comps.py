@@ -22,26 +22,40 @@ class CompsTag(RecordData):
             "B", self.dat_record.record[data_type_offset: data_type_offset + 1]
         )[0]
 
-        if data_type_int == 196:
-            self.data_type = "DINT"
-        elif data_type_int == 202:
-            self.data_type = "REAL"
-        elif data_type_int == 193:
-            self.data_type = "BOOL"
+        if data_type_int == 129:
+            self.data_type = "CONTROL"
+        elif data_type_int == 130:
+            self.data_type = "COUNTER"
         elif data_type_int == 131:
             self.data_type = "TIMER"
-        elif data_type_int == 206:
-            self.data_type = "STRING"
-        elif data_type_int == 129:
-            self.data_type = "CONTROL"
         elif data_type_int == 132:
             self.data_type = "PID"
         elif data_type_int == 135:
             self.data_type = "135"
-        elif data_type_int == 130:
-            self.data_type = "COUNTER"
+        elif data_type_int == 193:
+            self.data_type = "BOOL"
         elif data_type_int == 194:
-            self.data_type = "194"
+            self.data_type = "SINT"
+        elif data_type_int == 195:
+            self.data_type = "INT"
+        elif data_type_int == 196:
+            self.data_type = "DINT"
+        elif data_type_int == 197:
+            self.data_type = "LINT"
+        elif data_type_int == 198:
+            self.data_type = "USINT"
+        elif data_type_int == 199:
+            self.data_type = "UINT"
+        elif data_type_int == 200:
+            self.data_type = "UDINT"
+        elif data_type_int == 201:
+            self.data_type = "LWORD"
+        elif data_type_int == 202:
+            self.data_type = "REAL"
+        elif data_type_int == 203:
+            self.data_type = "LREAL"
+        elif data_type_int == 206:
+            self.data_type = "STRING"
         else:
             self.data_type = None
 
