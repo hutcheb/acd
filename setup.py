@@ -39,13 +39,13 @@ setup(
         "wheel",
     ],
     install_requires=[
-        "pytest-asyncio>=0.18.3",
-        "pip-tools",
         "loguru"
     ],
     extras_require={
         "dev": [
             "requires",
+            "pytest-asyncio>=0.18.3",
+            "pip-tools",
             "pre-commit>=2.6.0",
             "pytest-mock>=3.3.1",
             "mock>=4.0.2",

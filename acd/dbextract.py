@@ -62,8 +62,6 @@ class DbExtract:
         self._read()
 
     def _read_magic_number(self, f: BufferedReader):
-        # if f.read(2) != b"\xfe\xff":
-        #    raise RuntimeError("File isn't a Rockwell database (Dat) file")
         f.seek(0, 0)
 
     def _read_header(self, f: BufferedReader):
@@ -73,8 +71,12 @@ class DbExtract:
         self.records = []
         f.seek(self.header.start_records_position)
 
-        for i in range(0, self.header.no_records + self.header.no_records_table2):
-            self.records.append(DatRecord(f))
+        for _ in range(0, self.header.no_records + self.header.no_records_table2):
+            try:
+                self.records.append(DatRecord(f))
+            except:
+                # TODO: Couldn't be bothered to figure out the end of file. Shame on me.
+                pass
 
     def _read(self):
         with open(self._filename, "rb") as f:

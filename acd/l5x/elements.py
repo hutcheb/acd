@@ -216,8 +216,8 @@ class Controller(L5xElement):
     def __post_init__(self):
         self._cur.execute("SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=0 AND record_type=256")
         results = self._cur.fetchall()
-        if len(results) > 1:
-            raise Exception("Contains more than one root node")
+        if len(results) != 1:
+            raise Exception("Does not contain exactly one root controller node")
 
         self._object_id = results[0][1]
         self.controller_name = results[0][0]

@@ -6,9 +6,11 @@ import tempfile
 from dataclasses import dataclass, field
 from sqlite3 import Cursor
 
+from acd.comments import CommentsRecord
 from acd.comps import CompsRecord
 from acd.dbextract import DbExtract
 from acd.l5x.elements import Controller
+from acd.nameless import NamelessRecord
 from acd.sbregion import SbRegionRecord
 from acd.unzip import Unzip
 
@@ -38,6 +40,12 @@ class ExportL5x:
         self._cur.execute("CREATE TABLE rungs(object_id int, rung text, seq_number int)")
         log.debug("Create Region_map table in sqllite db")
         self._cur.execute("CREATE TABLE region_map(object_id int, parent_id int, unknown int, seq_no int, record BLOB NOT NULL)")
+        log.debug("Create Comments table in sqllite db")
+        self._cur.execute(
+            "CREATE TABLE comments(object_id int, not_sure int, comment_length int, comment text, seq_no int, record_type int, record BLOB NOT NULL)")
+        log.debug("Create Nameless table in sqllite db")
+        self._cur.execute(
+            "CREATE TABLE nameless(object_id int, parent_id int, record BLOB NOT NULL)")
 
         log.info("Extracting ACD database file")
         unzip = Unzip(self.input_filename)
@@ -45,7 +53,6 @@ class ExportL5x:
 
         log.info("Getting records from ACD Comps file and storing in sqllite database")
         comps_db = DbExtract(os.path.join(self._temp_dir, "Comps.Dat"))
-
         for record in comps_db.records:
             CompsRecord(self._cur, record)
         self._db.commit()
@@ -57,6 +64,18 @@ class ExportL5x:
         sb_region_db = DbExtract(os.path.join(self._temp_dir, "SbRegion.Dat"))
         for record in sb_region_db.records:
             SbRegionRecord(self._cur, record)
+        self._db.commit()
+
+        log.info("Getting records from ACD Comments file and storing in sqllite database")
+        comments_db = DbExtract(os.path.join(self._temp_dir, "Comments.Dat"))
+        for record in comments_db.records:
+            CommentsRecord(self._cur, record)
+            self._db.commit()
+
+        log.info("Getting records from ACD Nameless file and storing in sqllite database")
+        nameless_db = DbExtract(os.path.join(self._temp_dir, "Nameless.Dat"))
+        for record in nameless_db.records:
+            NamelessRecord(self._cur, record)
             self._db.commit()
 
         log.info("Creating Python Controller Object")
