@@ -19,21 +19,27 @@
 
 from setuptools import setup, find_packages
 
+from pathlib import Path
+this_directory = Path(__file__).parent
+long_description = (this_directory / "README.md").read_text()
+
 setup(
-    name="acd",
-    version="0.1",
+    name="acd-tools",
+    version="0.1a",
     description="Rockwell ACD File Tools",
     classifiers=[
         "Development Status :: 3 - Alpha",
-        "License :: OSI Approved :: Apache 2.0 License",
+        "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3.8",
         "Topic :: Scientific/Engineering :: Interface Engine/Protocol Translator",
     ],
     keywords="rockwell acd logix",
     url="https://github.com/hutcheb/acd",
-    author='""',
+    author="Ben Hutcheson",
     author_email="",
     license="Apache 2.0",
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     packages=find_packages(include=["acd", "acd.*"]),
     setup_requires=[
         "wheel",
