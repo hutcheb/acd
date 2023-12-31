@@ -25,7 +25,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name="acd-tools",
-    version="0.1a",
+    version="0.1a1",
     description="Rockwell ACD File Tools",
     classifiers=[
         "Development Status :: 3 - Alpha",
