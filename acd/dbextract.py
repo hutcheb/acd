@@ -71,7 +71,7 @@ class DbExtract:
         self.records = []
         f.seek(self.header.start_records_position)
 
-        for _ in range(0, self.header.no_records + self.header.no_records_table2):
+        for _ in range(0, self.header.no_records + self.header.no_records_table2 + 1):
             try:
                 self.records.append(DatRecord(f))
             except:

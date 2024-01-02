@@ -87,6 +87,8 @@ class ExportL5x:
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=0 AND comp_name='Region Map'")
         results = self._cur.fetchall()
 
+        if len(results) == 0:
+            return
         record = results[0][3]
 
         identifier_offset = 218

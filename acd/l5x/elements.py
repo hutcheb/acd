@@ -137,7 +137,12 @@ class AOI(L5xElement):
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
                 self._object_id) + " AND comp_name='RxRoutineCollection'")
         collection_results = self._cur.fetchall()
-        collection_id = collection_results[0][1]
+        if len(collection_results) != 0:
+            collection_id = collection_results[0][1]
+        else:
+            self.routines = []
+            self.tags: List[Tag] = []
+            return
 
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
