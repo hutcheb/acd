@@ -29,7 +29,7 @@ seq:
     type: record
     repeat: expr
     repeat-expr: header.num_of_records + header.table2_num_of_records
-    #repeat-expr: 2
+    #repeat-expr: 1
     
     
 
@@ -87,14 +87,11 @@ types:
   record:
     seq:
       - id: rec_magic_num
-        type: u2
-        #contents: [0xfa, 0xfa]
+        contents: [0xfa, 0xfa]
       - id: length
         type: u4
       - id: identifier
         type: u4
-      #based on the python code this 6 bytes shouldn't exist...but it looks like it does
-        # or I've screwed something else up, because my alignment is off by 6 bytes
       - id: erroneous_6_bytes
         type: u1
         repeat: expr
@@ -123,7 +120,7 @@ types:
       #    - REGION AST
       #        - the text for these come back as gibberish or a foreign language...must be binary not text
       #        - Doing a quick glance...it looks like it could have some UTF-8 in the data
-      - id: lang_type
+      - id: rec_type
         type: str
         size: 29
         encoding: UTF-8
@@ -131,14 +128,84 @@ types:
         type: u1
         repeat: expr
         repeat-expr: 12
-      - id: text_length
+      - id: rec_length
         type: u4
       # I'm not seeing any errors in the Katai IDE, but when I did a quick test
       # with the python generated parser, I was getting some errors about some
       # records text not being parsable as UTF-16
-      - id: text
-        type: str
-        size: text_length
-        encoding: UTF-16LE
+      #- id: text
+      #  type: str
+      #  size: text_length
+      #  encoding: UTF-16LE
         #encoding: UTF-8
-        
+      - id: rec_data
+        type:
+          switch-on: rec_type
+          cases:
+            '"REGION AST\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"': region_ast
+            '"REGION LE UID\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"': region_le_uid
+            '"REGION NT\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"': region_nt
+            '"REGION_MANGLED_SPECIFIER\0\0\0\0\0"': region_mangled_specifier
+            '"REGION_REF_COUNT\0\0\0\0\0\0\0\0\0\0\0\0\0"': region_ref_count
+            '"Rung NT\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"': rung_nt
+            _: unknown_rec
+            
+  region_ast:
+    seq:
+      - id: data
+        type: str
+        size: _parent.rec_length
+        encoding: UTF-8
+        #Their is still some gibberish in here, but in UTF8 there is some legible
+        #text here (as opposed to East Asian characters). So it could be either
+        #UTF8 or Ascii mixed with some binary info?
+  region_le_uid:
+    seq:
+      - id: data
+        type: str
+        size: _parent.rec_length
+        encoding: UTF-16LE
+        #encoding: UTF-16BE
+        #encoding: UTF-8
+        #This doesn't appear to be UTF16 or UTF-8
+        #must just be some binary data
+  region_nt:
+    seq:
+      - id: data
+        type: str
+        size: _parent.rec_length
+        encoding: UTF-16LE
+        #this one I would say is probably safe to say is UTF-16LE
+  region_mangled_specifier:
+    seq:
+      - id: data
+        type: str
+        size: _parent.rec_length
+        encoding: UTF-16LE
+        #the sample file I'm working with only has 3 instances of this type
+        #using UTF-16LE and UTF-8 parse the same, but there are \0x00 chars
+        #in between all the letters...so it's probably safe to say this is
+        #UTF-16LE
+  region_ref_count:
+    seq:
+      - id: data
+        type: str
+        size: _parent.rec_length
+        encoding: UTF-16LE
+        #encoding: UTF-16BE
+        #encoding: UTF-8
+        #the sample file I'm working with only has 3 instances of this type
+        #all of them are 4 bytes, and don't parse to anything meaningfull
+        #in UTF8/16 or ascii. I'm guessing this is just an int or something
+  rung_nt:
+    seq:
+      - id: data
+        type: str
+        size: _parent.rec_length
+        encoding: UTF-16LE
+  unknown_rec:
+    seq:
+      - id: data
+        type: str
+        size: _parent.rec_length
+        encoding: UTF-16LE
