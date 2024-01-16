@@ -129,6 +129,34 @@ types:
         repeat: expr
         repeat-expr: length - 144
   ptr_dat_record:
+    # Not sure what this is specifically, but it appears there aren't any in
+    # The sample program I'm testing with currently. Perhaps these are Aliases?
+    # I would have to check if this program has any aliases.
     seq:
-      - id: temporary_2
-        type: u1
+      - id: ptr_rec_unknown_1
+        type: u4
+        repeat: expr
+        repeat-expr: 2
+      - id: sequence_number
+        type: u2
+     - id: record_type
+        type: u2
+        #enum: ?
+      - id: ptr_dat_rec_unknown_2
+        type: u4
+      - id: obj_id
+        type: u4
+      - id: parent_id_offset
+        type: u4
+      - id: rec_text
+        type: str
+        size: 124
+        encoding: UTF-16LE
+      # since I have no examples of this currently, I'm not sure if this is the
+      #end of the record or not. The python code stops reading bytes at this point
+      #but it also did for the data record and there is no length field in this one
+      #or perhaps there is since the python code jups over the first 8 bytes of
+      # the ptr record, and the first 4 are the length in the other one...
+      # I would need an example to try and test agains though.
+      # hell honestly these 2 record types are 99% identical.
+      # It's possible these could get merged, but for now I'll leave them seperate
