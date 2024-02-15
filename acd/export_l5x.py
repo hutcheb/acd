@@ -12,6 +12,7 @@ from acd.dbextract import DbExtract
 from acd.l5x.elements import Controller
 from acd.nameless import NamelessRecord
 from acd.sbregion import SbRegionRecord
+from acd.unzip import Unzip
 
 from loguru import logger as log
 
