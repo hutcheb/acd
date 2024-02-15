@@ -12,7 +12,6 @@ from acd.dbextract import DbExtract
 from acd.l5x.elements import Controller
 from acd.nameless import NamelessRecord
 from acd.sbregion import SbRegionRecord
-from acd.unzip import Unzip
 
 from loguru import logger as log
 
@@ -24,12 +23,13 @@ class ExportL5x:
 
     def __post_init__(self):
         log.info("Creating temporary directory (if it doesn't exist to store ACD database files - " + self._temp_dir)
-        if os.path.exists(os.path.join(self._temp_dir, "acd.db")):
-            os.remove(os.path.join(self._temp_dir, "acd.db"))
+        _DEFAULT_SQL_DATABASE_NAME = "acd.db"
+        if os.path.exists(os.path.join(self._temp_dir, _DEFAULT_SQL_DATABASE_NAME)):
+            os.remove(os.path.join(self._temp_dir, _DEFAULT_SQL_DATABASE_NAME))
         if not os.path.exists(os.path.join(self._temp_dir)):
             os.makedirs(self._temp_dir)
         log.info("Creating sqllite database to store ACD database records")
-        self._db = sqlite3.connect(os.path.join(self._temp_dir, "acd.db"))
+        self._db = sqlite3.connect(os.path.join(self._temp_dir, _DEFAULT_SQL_DATABASE_NAME))
         self._cur: Cursor = self._db.cursor()
 
         log.debug("Create Comps table in sqllite db")
@@ -70,13 +70,13 @@ class ExportL5x:
         comments_db = DbExtract(os.path.join(self._temp_dir, "Comments.Dat"))
         for record in comments_db.records:
             CommentsRecord(self._cur, record)
-            self._db.commit()
+        self._db.commit()
 
         log.info("Getting records from ACD Nameless file and storing in sqllite database")
         nameless_db = DbExtract(os.path.join(self._temp_dir, "Nameless.Dat"))
         for record in nameless_db.records:
             NamelessRecord(self._cur, record)
-            self._db.commit()
+        self._db.commit()
 
         log.info("Creating Python Controller Object")
         self.controller = Controller(self._cur)
@@ -126,11 +126,6 @@ class ExportL5x:
             identifier_offset += 16
 
         self._db.commit()
-
-        pass
-
-
-
 
 
 if __name__ == "__main__":
