@@ -42,13 +42,13 @@ class FileRecord:
 
 @dataclass
 class Unzip:
-    filename: InitVar[str]
+    filename: InitVar[os.PathLike]
 
     def __post_init__(self, filename):
         self._filename = Path(filename)
         self._read()
 
-    def write_files(self, directory: str):
+    def write_files(self, directory: os.PathLike):
         Path(directory).mkdir(parents=True, exist_ok=True)
         with open(self._filename, "rb") as f:
             for record in self.records:
@@ -65,8 +65,8 @@ class Unzip:
     def _read_magic_number(self, f: BufferedReader):
         # Magic number is just the start of the first file in the archive
         # Even so it is a handy indicator
-        magicBytes = f.read(2)
-        if magicBytes != b"\x0d\x0a":
+        magic_bytes = f.read(2)
+        if magic_bytes != b"\x0d\x0a":
             raise RuntimeError("File isn't a Rockwell ACD file")
         f.seek(0, 0)
 
@@ -76,7 +76,7 @@ class Unzip:
     def _read_records(self, f: BufferedReader):
         f.seek(self.header.record_offset)
         self.records = []
-        for i in range(0, self.header.no_files):
+        for _ in range(0, self.header.no_files):
             self.records.append(FileRecord(f))
 
     def _read(self):

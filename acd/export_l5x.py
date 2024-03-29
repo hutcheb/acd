@@ -18,7 +18,7 @@ from loguru import logger as log
 
 @dataclass
 class ExportL5x:
-    input_filename: str
+    input_filename: os.PathLike
     output_filename: str
     _temp_dir: str = tempfile.mkdtemp()
 
@@ -93,9 +93,6 @@ class ExportL5x:
         record = results[0][3]
 
         identifier_offset = 218
-        record_identifier = struct.unpack(
-            "I", record[identifier_offset: identifier_offset + 4]
-        )[0]
 
         region_length = struct.unpack(
             "I", record[identifier_offset + 4: identifier_offset + 8]

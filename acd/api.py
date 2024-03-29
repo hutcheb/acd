@@ -1,10 +1,17 @@
 from dataclasses import dataclass
 from os import PathLike
 
+from acd.l5x.elements import Controller
+
+from acd.export_l5x import ExportL5x
+from acd.unzip import Unzip
+
+
 # Returned Project Structures
+@dataclass
 class Project:
     """Controller Project"""
-    pass
+    controller: Controller
 
 
 # Import Export Interfaces
@@ -32,7 +39,8 @@ class ImportProjectFromFile(ImportProject):
 
     def import_project(self) -> Project:
         # Import Project Interface
-        return Project()
+        export = ExportL5x(self.filename, "")
+        return Project(export.controller)
 
 
 @dataclass
@@ -71,7 +79,8 @@ class ExtractAcdDatabase(Extract):
 
     def extract(self):
         # Implement the extraction of an ACD file
-        pass
+        unzip = Unzip(self.filename)
+        unzip.write_files(self.output_directory)
 
 
 @dataclass
