@@ -55,7 +55,7 @@ def test_parse_datatypes_dat(controller):
 
 
 def test_parse_tags_dat(controller):
-    tag_name = controller.tags[75].text
+    tag_name = controller.tags[75].name
     data_type =  controller.tags[75].data_type
     assert data_type == 'BOOL'
     assert tag_name == 'Toggle'

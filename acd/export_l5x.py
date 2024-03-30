@@ -9,7 +9,7 @@ from sqlite3 import Cursor
 from acd.comments import CommentsRecord
 from acd.comps import CompsRecord
 from acd.dbextract import DbExtract
-from acd.l5x.elements import Controller
+from acd.l5x.elements import Controller, ControllerBuilder
 from acd.nameless import NamelessRecord
 from acd.sbregion import SbRegionRecord
 from acd.unzip import Unzip
@@ -80,7 +80,7 @@ class ExportL5x:
         self._db.commit()
 
         log.info("Creating Python Controller Object")
-        self.controller = Controller(self._cur)
+        self.controller = ControllerBuilder(self._cur).build()
 
 
     def populate_region_map(self):

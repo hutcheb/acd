@@ -5,22 +5,33 @@ from typing import List
 
 
 @dataclass
-class L5xElement:
+class L5xElementBuilder:
     _cur: Cursor
     _object_id: int = -1
 
 
 @dataclass
-class DataType(L5xElement):
+class L5xElement:
+    pass
 
-    def __post_init__(self):
+
+@dataclass
+class DataType(L5xElement):
+    name: str
+    children: List[str]
+
+
+@dataclass
+class DataTypeBuilder(L5xElementBuilder):
+
+    def build(self) -> DataType:
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
                 self._object_id))
         results = self._cur.fetchall()
 
         record = results[0][3]
-        self.name = results[0][0]
+        name = results[0][0]
 
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
@@ -33,40 +44,49 @@ class DataType(L5xElement):
                 "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
                     member_collection_id))
             children_results = self._cur.fetchall()
-            self.children = []
+            children = []
             for child in children_results:
-                self.children.append(child[0])
+                children.append(child[0])
+            return DataType(name, children)
+        return DataType(name, [])
 
 
 @dataclass
 class Tag(L5xElement):
+    name: str
+    hidden: int
+    data_type: str
 
-    def __post_init__(self):
+
+@dataclass
+class TagBuilder(L5xElementBuilder):
+
+    def build(self) -> Tag:
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
                 self._object_id))
         results = self._cur.fetchall()
 
         record = results[0][3]
-        self.text = results[0][0]
+        name = results[0][0]
 
         hidden_offset = 8
-        self.hidden = struct.unpack(
+        hidden = struct.unpack(
             "H", record[hidden_offset: hidden_offset + 2]
         )[0] == 256
 
         one_dim_array_length_offest = 174
-        self.one_dim_array_length = struct.unpack(
+        _one_dim_array_length = struct.unpack(
             "I", record[one_dim_array_length_offest: one_dim_array_length_offest + 4]
         )[0]
 
         two_dim_array_length_offest = 178
-        self.two_dim_array_length = struct.unpack(
+        _two_dim_array_length = struct.unpack(
             "I", record[two_dim_array_length_offest: two_dim_array_length_offest + 4]
         )[0]
 
         three_dim_array_length_offest = 182
-        self.three_dim_array_length = struct.unpack(
+        _three_dim_array_length = struct.unpack(
             "I", record[three_dim_array_length_offest: three_dim_array_length_offest + 4]
         )[0]
 
@@ -76,62 +96,74 @@ class Tag(L5xElement):
         )[0]
 
         if data_type_id == 4294967295:
-            self.data_type = ""
+            data_type = ""
         else:
             self._cur.execute(
                 "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
                     data_type_id))
             data_type_results = self._cur.fetchall()
 
-            self.data_type = data_type_results[0][0]
+            data_type = data_type_results[0][0]
 
-        if  self.one_dim_array_length != 0:
-            self.data_type = self.data_type + "[" + str(self.one_dim_array_length) + "]"
-        if  self.two_dim_array_length != 0:
-            self.data_type = self.data_type + "[" + str(self.two_dim_array_length) + "]"
-        if  self.three_dim_array_length != 0:
-            self.data_type = self.data_type + "[" + str(self.three_dim_array_length) + "]"
-
-
-
+        if _one_dim_array_length != 0:
+            data_type = data_type + "[" + str(_one_dim_array_length) + "]"
+        if _two_dim_array_length != 0:
+            data_type = data_type + "[" + str(_two_dim_array_length) + "]"
+        if _three_dim_array_length != 0:
+            data_type = data_type + "[" + str(_three_dim_array_length) + "]"
+        return Tag(name, hidden, data_type)
 
 @dataclass
 class Routine(L5xElement):
+    name: str
+    rungs: List[str]
 
-    def __post_init__(self):
+
+@dataclass
+class RoutineBuilder(L5xElementBuilder):
+
+    def build(self) -> Routine:
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
                 self._object_id))
         results = self._cur.fetchall()
 
         record = results[0][3]
-        self.name = results[0][0]
+        name = results[0][0]
 
         self._cur.execute(
             "SELECT object_id, parent_id, seq_no FROM region_map WHERE parent_id=" + str(
                 self._object_id) +  " ORDER BY seq_no")
         results = self._cur.fetchall()
-        self.rungs = []
+        rungs = []
         for member in results:
             self._cur.execute(
                 "SELECT object_id, rung FROM rungs WHERE object_id=" + str(
                     member[0]))
             rungs_results = self._cur.fetchall()
             if len(rungs_results) > 0:
-                self.rungs.append(rungs_results[0][1])
-        pass
+                rungs.append(rungs_results[0][1])
+        return Routine(name, rungs)
+
 
 @dataclass
 class AOI(L5xElement):
+    name: str
+    routines: List[Routine]
+    tags: List[Tag]
 
-    def __post_init__(self):
+
+@dataclass
+class AoiBuilder(L5xElementBuilder):
+
+    def build(self) -> AOI:
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
                 self._object_id))
         results = self._cur.fetchall()
 
         record = results[0][3]
-        self.name = results[0][0]
+        name = results[0][0]
 
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
@@ -140,18 +172,18 @@ class AOI(L5xElement):
         if len(collection_results) != 0:
             collection_id = collection_results[0][1]
         else:
-            self.routines = []
-            self.tags: List[Tag] = []
-            return
+            routines = []
+            tags: List[Tag] = []
+            return AOI(name, routines, tags)
 
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
                 collection_id))
         routine_results = self._cur.fetchall()
 
-        self.routines = []
+        routines = []
         for child in routine_results:
-            self.routines.append(Routine(self._cur, child[1]))
+            routines.append(RoutineBuilder(self._cur, child[1]).build())
 
         # Get the Program Scoped Tags
         self._cur.execute(
@@ -165,22 +197,30 @@ class AOI(L5xElement):
             "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
                 results[0][1]))
         results = self._cur.fetchall()
-        self.tags: List[Tag] = []
+        tags: List[Tag] = []
         for result in results:
-            self.tags.append(Tag(self._cur, result[1]))
+            tags.append(TagBuilder(self._cur, result[1]).build())
+
+        return AOI(name, routines, tags)
 
 
 @dataclass
 class Program(L5xElement):
+    name: str
+    routines: List[Routine]
+    tags: List[Tag]
 
-    def __post_init__(self):
+
+@dataclass
+class ProgramBuilder(L5xElementBuilder):
+
+    def build(self) -> Program:
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
                 self._object_id))
         results = self._cur.fetchall()
 
-        record = results[0][3]
-        self.name = results[0][0]
+        name = results[0][0]
 
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
@@ -193,9 +233,9 @@ class Program(L5xElement):
                 collection_id))
         routine_results = self._cur.fetchall()
 
-        self.routines = []
+        routines = []
         for child in routine_results:
-            self.routines.append(Routine(self._cur, child[1]))
+            routines.append(RoutineBuilder(self._cur, child[1]).build())
 
         # Get the Program Scoped Tags
         self._cur.execute(
@@ -209,23 +249,35 @@ class Program(L5xElement):
             "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
                 results[0][1]))
         results = self._cur.fetchall()
-        self.tags: List[Tag] = []
+        tags: List[Tag] = []
         for result in results:
-            self.tags.append(Tag(self._cur, result[1]))
+            tags.append(TagBuilder(self._cur, result[1]).build())
+
+        return Program(name, routines, tags)
 
 
 @dataclass
 class Controller(L5xElement):
-    controller_name: str = ""
+    name: str
+    data_types: List[DataType]
+    tags: List[Tag]
+    programs: List[Program]
+    aois: List[AOI]
 
-    def __post_init__(self):
-        self._cur.execute("SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=0 AND record_type=256")
+
+
+@dataclass
+class ControllerBuilder(L5xElementBuilder):
+
+    def build(self) -> Controller:
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=0 AND record_type=256")
         results = self._cur.fetchall()
         if len(results) != 1:
             raise Exception("Does not contain exactly one root controller node")
 
         self._object_id = results[0][1]
-        self.controller_name = results[0][0]
+        controller_name = results[0][0]
 
         # Get the data types
         self._cur.execute(
@@ -235,28 +287,33 @@ class Controller(L5xElement):
         if len(results) > 1:
             raise Exception("Contains more than one controller data type collection")
 
+        _data_type_id = results[0][1]
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                results[0][1]))
+                _data_type_id))
         results = self._cur.fetchall()
-        self.data_types: List[DataType] = []
+
+        data_types: List[DataType] = []
         for result in results:
-            self.data_types.append(DataType(self._cur, result[1]))
+            _data_type_object_id = result[1]
+            data_types.append(DataTypeBuilder(self._cur, _data_type_object_id).build())
 
         # Get the Controller Scoped Tags
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" +  str(self._object_id) + " AND comp_name='RxTagCollection'")
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
+                self._object_id) + " AND comp_name='RxTagCollection'")
         results = self._cur.fetchall()
         if len(results) > 1:
             raise Exception("Contains more than one controller tag collection")
-
+        _tag_collection_object_id = results[0][1]
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                results[0][1]))
+                _tag_collection_object_id))
         results = self._cur.fetchall()
-        self.tags: List[Tag] = []
+        tags: List[Tag] = []
         for result in results:
-            self.tags.append(Tag(self._cur, result[1]))
+            _tag_object_id = result[1]
+            tags.append(TagBuilder(self._cur, _tag_object_id).build())
 
         # Get the Program Collection and get the programs
         self._cur.execute(
@@ -266,13 +323,15 @@ class Controller(L5xElement):
         if len(results) > 1:
             raise Exception("Contains more than one controller program collection")
 
+        _program_collection_object_id = results[0][1]
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                results[0][1]))
+                _program_collection_object_id))
         results = self._cur.fetchall()
-        self.programs: List[Program] = []
+        programs: List[Program] = []
         for result in results:
-            self.programs.append(Program(self._cur, result[1]))
+            _program_object_id = result[1]
+            programs.append(ProgramBuilder(self._cur, _program_object_id).build())
 
         # Get the AOI Collection and get the AOIs
         self._cur.execute(
@@ -281,11 +340,14 @@ class Controller(L5xElement):
         results = self._cur.fetchall()
         if len(results) > 1:
             raise Exception("Contains more than one AOI collection")
-
+        _aoi_collection_object_id = results[0][1]
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                results[0][1]))
+                _aoi_collection_object_id))
         results = self._cur.fetchall()
-        self.aois: List[Program] = []
+        aois: List[AOI] = []
         for result in results:
-            self.aois.append(AOI(self._cur, result[1]))
+            _aoi_object_id = result[1]
+            aois.append(AOI(self._cur, _aoi_object_id))
+
+        return Controller(controller_name, data_types, tags, programs, aois)
