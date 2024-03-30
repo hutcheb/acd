@@ -12,13 +12,43 @@ class L5xElementBuilder:
 
 @dataclass
 class L5xElement:
-    pass
+    name: str
 
 
 @dataclass
 class DataType(L5xElement):
-    name: str
     children: List[str]
+
+
+@dataclass
+class Tag(L5xElement):
+    hidden: int
+    data_type: str
+
+
+@dataclass
+class Routine(L5xElement):
+    rungs: List[str]
+
+
+@dataclass
+class AOI(L5xElement):
+    routines: List[Routine]
+    tags: List[Tag]
+
+
+@dataclass
+class Program(L5xElement):
+    routines: List[Routine]
+    tags: List[Tag]
+
+
+@dataclass
+class Controller(L5xElement):
+    data_types: List[DataType]
+    tags: List[Tag]
+    programs: List[Program]
+    aois: List[AOI]
 
 
 @dataclass
@@ -49,13 +79,6 @@ class DataTypeBuilder(L5xElementBuilder):
                 children.append(child[0])
             return DataType(name, children)
         return DataType(name, [])
-
-
-@dataclass
-class Tag(L5xElement):
-    name: str
-    hidden: int
-    data_type: str
 
 
 @dataclass
@@ -113,11 +136,6 @@ class TagBuilder(L5xElementBuilder):
             data_type = data_type + "[" + str(_three_dim_array_length) + "]"
         return Tag(name, hidden, data_type)
 
-@dataclass
-class Routine(L5xElement):
-    name: str
-    rungs: List[str]
-
 
 @dataclass
 class RoutineBuilder(L5xElementBuilder):
@@ -144,13 +162,6 @@ class RoutineBuilder(L5xElementBuilder):
             if len(rungs_results) > 0:
                 rungs.append(rungs_results[0][1])
         return Routine(name, rungs)
-
-
-@dataclass
-class AOI(L5xElement):
-    name: str
-    routines: List[Routine]
-    tags: List[Tag]
 
 
 @dataclass
@@ -205,13 +216,6 @@ class AoiBuilder(L5xElementBuilder):
 
 
 @dataclass
-class Program(L5xElement):
-    name: str
-    routines: List[Routine]
-    tags: List[Tag]
-
-
-@dataclass
 class ProgramBuilder(L5xElementBuilder):
 
     def build(self) -> Program:
@@ -254,16 +258,6 @@ class ProgramBuilder(L5xElementBuilder):
             tags.append(TagBuilder(self._cur, result[1]).build())
 
         return Program(name, routines, tags)
-
-
-@dataclass
-class Controller(L5xElement):
-    name: str
-    data_types: List[DataType]
-    tags: List[Tag]
-    programs: List[Program]
-    aois: List[AOI]
-
 
 
 @dataclass
