@@ -1,5 +1,9 @@
+import os
+import shutil
 import struct
 from dataclasses import dataclass
+from os import PathLike
+from pathlib import Path
 from sqlite3 import Cursor
 from typing import List
 
@@ -345,3 +349,28 @@ class ControllerBuilder(L5xElementBuilder):
             aois.append(AOI(self._cur, _aoi_object_id))
 
         return Controller(controller_name, data_types, tags, programs, aois)
+
+@dataclass
+class DumpCompsRecords(L5xElementBuilder):
+    base_directory: PathLike = Path("dump")
+
+    def dump(self, parent_id: int = 0):
+        self._cur.execute(
+            f"SELECT comp_name, object_id, parent_id, record_type, record FROM comps WHERE parent_id={parent_id}")
+        results = self._cur.fetchall()
+
+        for result in results:
+            object_id = result[1]
+            name = result[0]
+            record = result[4]
+            new_path = Path(os.path.join(self.base_directory, name))
+            if os.path.exists(os.path.join(new_path)):
+                shutil.rmtree(os.path.join(new_path))
+            if not os.path.exists(os.path.join(new_path)):
+                os.makedirs(new_path)
+            with open(Path(os.path.join(new_path, name + ".dat")), "wb") as file:
+                file.write(record)
+
+            DumpCompsRecords(self._cur, object_id, new_path).dump(object_id)
+
+

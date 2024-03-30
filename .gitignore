@@ -8,3 +8,4 @@ venv
 build
 .idea
 dist
+/test/dump/
