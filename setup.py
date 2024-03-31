@@ -45,7 +45,8 @@ setup(
         "wheel",
     ],
     install_requires=[
-        "loguru"
+        "loguru",
+        "kaitaistruct",
     ],
     extras_require={
         "dev": [

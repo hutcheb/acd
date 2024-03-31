@@ -9,3 +9,5 @@ build
 .idea
 dist
 /test/dump/
+/.mypy_cache/
+/acd_tools.egg-info/

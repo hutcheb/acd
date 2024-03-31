@@ -1,29 +1,56 @@
 meta:
-  id: RxTag
+  id: rx_tag
   endian: le
   tags:
     - version: 60
+instances:
+  first_array_dimension:
+    pos: 0xAE
+    type: u4
+  second_array_dimension:
+    pos: 0xB2
+    type: u4
+  third_array_dimension:
+    pos: 0xB6
+    type: u4
+  data_type_id:
+    pos: 0xBE
+    type: u4
+  tag_name_length:
+    pos: 0xEE
+    type: u2
+  tag_name:
+    pos: 0xF0
+    type: str
+    size: tag_name_length
+    encoding: UTF-8
+
 seq:
   - id: header
     type: header
-  - id: logical_screen
-    type: logical_screen
+  - id: parent_id
+    type: u4
+  - id: unique_tag_identifier
+    type: u4
 types:
   header:
     seq:
-      - id: magic
-        contents: 'GIF'
-      - id: version
-        size: 3
-  logical_screen:
-    seq:
-      - id: image_width
+      - id: length
+        type: u4
+      - id: blank_1
+        type: u4
+      - id: seq_number
         type: u2
-      - id: image_height
+      - id: record_type
         type: u2
-      - id: flags
-        type: u1
-      - id: bg_color_index
-        type: u1
-      - id: pixel_aspect_ratio
-        type: u1
+      - id: blank_2
+        type: u4
+      - id: object_id
+        type: u4
+      - id: parent_id
+        type: u4
+      - id: name
+        type: str
+        size: 124
+        encoding: UTF-16
+ 
