@@ -20,7 +20,7 @@ from loguru import logger as log
 class ExportL5x:
     input_filename: os.PathLike
     output_filename: str
-    _temp_dir: str = tempfile.mkdtemp()
+    _temp_dir: str = "build" #tempfile.mkdtemp()
 
     def __post_init__(self):
         log.info("Creating temporary directory (if it doesn't exist to store ACD database files - " + self._temp_dir)
@@ -53,8 +53,8 @@ class ExportL5x:
         unzip.write_files(self._temp_dir)
 
         log.info("Getting records from ACD Comps file and storing in sqllite database")
-        comps_db = DbExtract(os.path.join(self._temp_dir, "Comps.Dat"))
-        for record in comps_db.records:
+        comps_db = DbExtract(os.path.join(self._temp_dir, "Comps.Dat")).read()
+        for record in comps_db.records.record:
             CompsRecord(self._cur, record)
         self._db.commit()
 

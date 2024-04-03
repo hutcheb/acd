@@ -16,12 +16,28 @@
 # specific language governing permissions and limitations
 # under the License.
 #
+import subprocess
 
 from setuptools import setup, find_packages
+from setuptools.command.install import install as _install
 
 from pathlib import Path
 this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
+
+class install(_install):
+    def run(self):
+        subprocess.run(["ksc", "-t", "python", "--outdir", "acd/generated/", "--python-package", "acd.generated", "resources/templates/Dat/Dat.ksy"])
+        subprocess.run(["ksc", "-t", "python", "--outdir", "acd/generated/comps/", "--python-package", "acd.generated.comps", "resources/templates/Comps/RxTag.ksy"])
+        subprocess.run(
+            ["ksc", "-t", "python", "--outdir", "acd/generated/comps/", "--python-package", "acd.generated.comps",
+             "resources/templates/Comps/FAFA_Comps.ksy"])
+        _install.run(self)
+        subprocess.run(
+            ["ksc", "-t", "python", "--outdir", "acd/generated/comps/", "--python-package", "acd.generated.comps",
+             "resources/templates/Comps/FDFD_Comps.ksy"])
+        _install.run(self)
+        print("--------------------------------------------------------------------")
 
 setup(
     name="acd-tools",
@@ -60,4 +76,5 @@ setup(
             "flake8>=4.0.1",
         ]
     },
+    cmdclass={'install': install},
 )

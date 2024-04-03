@@ -3,6 +3,9 @@ from dataclasses import dataclass
 from sqlite3 import Cursor
 
 from acd.dbextract import DatRecord
+from acd.generated.comps.fafa_comps import FafaComps
+from acd.generated.comps.fdfd_comps import FdfdComps
+
 
 @dataclass
 class RecordData:
@@ -20,72 +23,31 @@ class CompsRecord:
 
     def __post_init__(self):
 
-        if self.dat_record.identifier == b'\xfa\xfa':
-            # Data record
-            record_length_offset = 0
-            self.record_length = struct.unpack(
-                "I", self.dat_record.record[0 : record_length_offset + 4]
-            )[0]
-
-            seq_number_offset = 8
-            self.seq_number = struct.unpack(
-                "H", self.dat_record.record[seq_number_offset: seq_number_offset + 2]
-            )[0]
-
-            record_type_offset = 10
-            self.record_type = struct.unpack(
-                "H", self.dat_record.record[record_type_offset: record_type_offset + 2]
-            )[0]
-
-            object_id_offset = 16
-            self.object_id = struct.unpack(
-                "I", self.dat_record.record[object_id_offset : object_id_offset + 4]
-            )[0]
-
-            parent_id_offset = 20
-            self.parent_id = struct.unpack(
-                "I", self.dat_record.record[parent_id_offset: parent_id_offset + 4]
-            )[0]
-
-            text_offset = 24
-            self.text = self.dat_record.record[
-                        text_offset: text_offset + 124
-                        ].decode("utf-16-le").split("\x00")[0]
+        if self.dat_record.identifier == 64250:
+            fafa_comps = FafaComps.from_bytes(self.dat_record.record.record_buffer)
+            self.seq_number = fafa_comps.header.seq_number
+            self.record_type = fafa_comps.header.record_type
+            self.object_id = fafa_comps.header.object_id
+            self.parent_id = fafa_comps.header.parent_id
+            self.text = fafa_comps.header.record_name
 
             query: str = "INSERT INTO comps VALUES (?, ?, ?, ?, ?, ?)"
-            enty: tuple = (self.object_id, self.parent_id, self.text, self.seq_number, self.record_type, self.dat_record.record)
+            enty: tuple = (self.object_id, self.parent_id, self.text, self.seq_number, self.record_type, fafa_comps.record_buffer)
             self._cur.execute(query, enty)
 
 
-        elif self.dat_record.identifier == b'\xfd\xfd':
+        elif self.dat_record.identifier == 65021:
             # Pointer to Data record
-            seq_number_offset = 8
-            self.seq_number = struct.unpack(
-                "H", self.dat_record.record[seq_number_offset: seq_number_offset + 2]
-            )[0]
+            fdfd_comps = FdfdComps.from_bytes(self.dat_record.record.record_buffer)
+            self.seq_number = fafa_comps.header.seq_number
+            self.record_type = fafa_comps.header.record_type
+            self.object_id = fafa_comps.header.object_id
+            self.parent_id = fafa_comps.header.parent_id
+            self.text = fafa_comps.header.record_name
 
-            record_type_offset = 10
-            self.record_type = struct.unpack(
-                "H", self.dat_record.record[record_type_offset: record_type_offset + 2]
-            )[0]
-
-            object_id_offset = 16
-            self.object_id = struct.unpack(
-                "I", self.dat_record.record[object_id_offset: object_id_offset + 4]
-            )[0]
-
-            parent_id_offset = 20
-            self.parent_id = struct.unpack(
-                "I", self.dat_record.record[parent_id_offset: parent_id_offset + 4]
-            )[0]
-
-            text_offset = 24
-            self.text = self.dat_record.record[
-                        text_offset: text_offset + 124
-                        ].decode("utf-16-le").split("\x00")[0]
-
-            query: str = "INSERT INTO pointers VALUES (?, ?, ?, ?, ?, ?)"
-            enty: tuple = (self.object_id, self.parent_id, self.text, self.seq_number, self.record_type, self.dat_record.record)
+            query: str = "INSERT INTO comps VALUES (?, ?, ?, ?, ?, ?)"
+            enty: tuple = (
+            self.object_id, self.parent_id, self.text, self.seq_number, self.record_type, fafa_comps.record_buffer)
             self._cur.execute(query, enty)
 
         else:
