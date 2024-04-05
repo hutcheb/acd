@@ -17,7 +17,7 @@ class FdfdComps(KaitaiStruct):
 
     def _read(self):
         self.header = FdfdComps.Header(self._io, self, self._root)
-        self.record_buffer = self._io.read_bytes(((self.record_length - 144) - 4))
+        self.record_buffer = self._io.read_bytes(((self.record_length - 155) - 4))
 
     class Header(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):
@@ -27,14 +27,62 @@ class FdfdComps(KaitaiStruct):
             self._read()
 
         def _read(self):
-            self.unknown_1 = self._io.read_u4le()
-            self.seq_number = self._io.read_u2le()
-            self.record_type = self._io.read_u2le()
-            self.unknown_4 = self._io.read_u2le()
-            self.unknown_5 = self._io.read_u2le()
-            self.object_id = self._io.read_u4le()
-            self.parent_id = self._io.read_u4le()
-            self.record_name = (self._io.read_bytes(124)).decode(u"UTF-16")
+            pass
+
+        @property
+        def record_type(self):
+            if hasattr(self, '_m_record_type'):
+                return self._m_record_type
+
+            _pos = self._io.pos()
+            self._io.seek(10)
+            self._m_record_type = self._io.read_u2le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_record_type', None)
+
+        @property
+        def object_id(self):
+            if hasattr(self, '_m_object_id'):
+                return self._m_object_id
+
+            _pos = self._io.pos()
+            self._io.seek(16)
+            self._m_object_id = self._io.read_u4le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_object_id', None)
+
+        @property
+        def record_name(self):
+            if hasattr(self, '_m_record_name'):
+                return self._m_record_name
+
+            _pos = self._io.pos()
+            self._io.seek(24)
+            self._m_record_name = (self._io.read_bytes(124)).decode(u"UTF-16")
+            self._io.seek(_pos)
+            return getattr(self, '_m_record_name', None)
+
+        @property
+        def seq_number(self):
+            if hasattr(self, '_m_seq_number'):
+                return self._m_seq_number
+
+            _pos = self._io.pos()
+            self._io.seek(4)
+            self._m_seq_number = self._io.read_u2le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_seq_number', None)
+
+        @property
+        def parent_id(self):
+            if hasattr(self, '_m_parent_id'):
+                return self._m_parent_id
+
+            _pos = self._io.pos()
+            self._io.seek(20)
+            self._m_parent_id = self._io.read_u4le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_parent_id', None)
 
 
 

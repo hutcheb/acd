@@ -12,22 +12,21 @@ seq:
     size: record_length - 144 - 4
 types:
   header:
-    seq:
-      - id: unknown_1
+     instances:
+      seq_number:
+        pos: 0x04
+        type: u2
+      record_type:
+        pos: 0x06
+        type: u2
+      object_id:
+        pos: 0x10
         type: u4
-      - id: seq_number
-        type: u2
-      - id: record_type
-        type: u2
-      - id: unknown_4
-        type: u2
-      - id: unknown_5
-        type: u2
-      - id: object_id
+      parent_id:
+        pos: 0x14
         type: u4
-      - id: parent_id
-        type: u4
-      - id: record_name
+      record_name:
+        pos: 0x18
         type: str
         size: 124
         encoding: UTF-16

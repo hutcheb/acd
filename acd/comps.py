@@ -1,6 +1,9 @@
 import struct
 from dataclasses import dataclass
+from io import BytesIO
 from sqlite3 import Cursor
+
+from kaitaistruct import KaitaiStream
 
 from acd.dbextract import DatRecord
 from acd.generated.comps.fafa_comps import FafaComps
@@ -24,34 +27,14 @@ class CompsRecord:
     def __post_init__(self):
 
         if self.dat_record.identifier == 64250:
-            fafa_comps = FafaComps.from_bytes(self.dat_record.record.record_buffer)
-            self.seq_number = fafa_comps.header.seq_number
-            self.record_type = fafa_comps.header.record_type
-            self.object_id = fafa_comps.header.object_id
-            self.parent_id = fafa_comps.header.parent_id
-            self.text = fafa_comps.header.record_name
-
-            query: str = "INSERT INTO comps VALUES (?, ?, ?, ?, ?, ?)"
-            enty: tuple = (self.object_id, self.parent_id, self.text, self.seq_number, self.record_type, fafa_comps.record_buffer)
-            self._cur.execute(query, enty)
-
-
+            r = FafaComps.from_bytes(self.dat_record.record.record_buffer)
         elif self.dat_record.identifier == 65021:
-            # Pointer to Data record
-            fdfd_comps = FdfdComps.from_bytes(self.dat_record.record.record_buffer)
-            self.seq_number = fafa_comps.header.seq_number
-            self.record_type = fafa_comps.header.record_type
-            self.object_id = fafa_comps.header.object_id
-            self.parent_id = fafa_comps.header.parent_id
-            self.text = fafa_comps.header.record_name
-
-            query: str = "INSERT INTO comps VALUES (?, ?, ?, ?, ?, ?)"
-            enty: tuple = (
-            self.object_id, self.parent_id, self.text, self.seq_number, self.record_type, fafa_comps.record_buffer)
-            self._cur.execute(query, enty)
-
+            r = FdfdComps(self.dat_record.record_length, KaitaiStream(BytesIO(self.dat_record.record.record_buffer)))
         else:
-            self.text = ""
-            self.object_id = -1
+            return
 
-
+        query: str = "INSERT INTO comps VALUES (?, ?, ?, ?, ?, ?)"
+        entry: tuple = (
+            r.header.object_id, r.header.parent_id, r.header.record_name, r.header.seq_number, r.header.record_type,
+            r.record_buffer)
+        self._cur.execute(query, entry)

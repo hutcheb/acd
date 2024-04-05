@@ -1,21 +1,23 @@
 meta:
-  id: fdfd_comps
+  id: fafa_comps
   endian: le
   tags:
     - version: 33
 seq:
+  - id: record_length
+    type: u4
   - id: header
     type: header
   - id: record_buffer
-    size: record_length - 155 - 4
+    size: record_length - 144 - 4
 types:
   header:
-    instances:
-      seq_number:
+     instances:
+      oridinal:
         pos: 0x04
         type: u2
       record_type:
-        pos: 0x0A
+        pos: 0x06
         type: u2
       object_id:
         pos: 0x10
@@ -28,6 +30,3 @@ types:
         type: str
         size: 124
         encoding: UTF-16
-params:
-  - id: record_length
-    type: u4

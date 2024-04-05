@@ -62,13 +62,13 @@ class ExportL5x:
         self.populate_region_map()
 
         log.info("Getting records from ACD SbRegion file and storing in sqllite database")
-        sb_region_db = DbExtract(os.path.join(self._temp_dir, "SbRegion.Dat"))
-        for record in sb_region_db.records:
+        sb_region_db = DbExtract(os.path.join(self._temp_dir, "SbRegion.Dat")).read()
+        for record in sb_region_db.records.record:
             SbRegionRecord(self._cur, record)
         self._db.commit()
 
         log.info("Getting records from ACD Comments file and storing in sqllite database")
-        comments_db = DbExtract(os.path.join(self._temp_dir, "Comments.Dat"))
+        comments_db = DbExtract(os.path.join(self._temp_dir, "Comments.Dat")).read()
         for record in comments_db.records:
             CommentsRecord(self._cur, record)
         self._db.commit()
