@@ -34,7 +34,8 @@ class CompsRecord:
             return
 
         query: str = "INSERT INTO comps VALUES (?, ?, ?, ?, ?, ?)"
+        ss = r.header.record_name.as_string
         entry: tuple = (
-            r.header.object_id, r.header.parent_id, r.header.record_name, r.header.seq_number, r.header.record_type,
+            r.header.object_id, r.header.parent_id, r.header.record_name.as_string, r.header.seq_number, r.header.record_type,
             r.record_buffer)
         self._cur.execute(query, entry)

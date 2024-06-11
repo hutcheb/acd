@@ -59,7 +59,7 @@ class ExportL5x:
         self._db.commit()
 
         log.info("Getting records from ACD Region Map file and storing in sqllite database")
-        self.populate_region_map()
+        #self.populate_region_map()
 
         log.info("Getting records from ACD SbRegion file and storing in sqllite database")
         sb_region_db = DbExtract(os.path.join(self._temp_dir, "SbRegion.Dat")).read()

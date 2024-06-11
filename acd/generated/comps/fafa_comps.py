@@ -58,7 +58,9 @@ class FafaComps(KaitaiStruct):
 
             _pos = self._io.pos()
             self._io.seek(24)
-            self._m_record_name = (self._io.read_bytes(124)).decode(u"UTF-16")
+            self._raw__m_record_name = self._io.read_bytes(124)
+            _io__raw__m_record_name = KaitaiStream(BytesIO(self._raw__m_record_name))
+            self._m_record_name = FafaComps.Unicode16(_io__raw__m_record_name, self, self._root)
             self._io.seek(_pos)
             return getattr(self, '_m_record_name', None)
 
@@ -83,6 +85,57 @@ class FafaComps(KaitaiStruct):
             self._m_parent_id = self._io.read_u4le()
             self._io.seek(_pos)
             return getattr(self, '_m_parent_id', None)
+
+
+    class Unicode16(KaitaiStruct):
+        def __init__(self, _io, _parent=None, _root=None):
+            self._io = _io
+            self._parent = _parent
+            self._root = _root if _root else self
+            self._read()
+
+        def _read(self):
+            if self.start_ >= 0:
+                self.first = self._io.read_bytes(0)
+
+            self.c = []
+            i = 0
+            while True:
+                _ = self._io.read_u2le()
+                self.c.append(_)
+                if _ == 0:
+                    break
+                i += 1
+            if self.end_ >= 0:
+                self.last = self._io.read_bytes(0)
+
+
+        @property
+        def start_(self):
+            if hasattr(self, '_m_start_'):
+                return self._m_start_
+
+            self._m_start_ = self._io.pos()
+            return getattr(self, '_m_start_', None)
+
+        @property
+        def end_(self):
+            if hasattr(self, '_m_end_'):
+                return self._m_end_
+
+            self._m_end_ = self._io.pos()
+            return getattr(self, '_m_end_', None)
+
+        @property
+        def as_string(self):
+            if hasattr(self, '_m_as_string'):
+                return self._m_as_string
+
+            _pos = self._io.pos()
+            self._io.seek(self.start_)
+            self._m_as_string = (self._io.read_bytes(((self.end_ - self.start_) - 2))).decode(u"UTF-16")
+            self._io.seek(_pos)
+            return getattr(self, '_m_as_string', None)
 
 
 
