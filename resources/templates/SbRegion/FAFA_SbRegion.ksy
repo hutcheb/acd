@@ -1,5 +1,5 @@
 meta:
-  id: fafa_comps
+  id: fafa_sbregions
   endian: le
   tags:
     - version: 33
@@ -12,21 +12,7 @@ seq:
     size: record_length - 144 - 4
 types:
   header:
-     instances:
-      oridinal:
-        pos: 0x04
+     seq:
+      - id: sb_regions
         type: u2
-      record_type:
-        pos: 0x06
-        type: u2
-      object_id:
-        pos: 0x10
-        type: u4
-      parent_id:
-        pos: 0x14
-        type: u4
-      record_name:
-        pos: 0x18
-        type: str
-        size: 124
-        encoding: UTF-16
+

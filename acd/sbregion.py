@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from sqlite3 import Cursor
 
 from acd.dbextract import DatRecord
+from acd.generated.sbregion.fafa_sbregions import FafaSbregions
 
 
 @dataclass
@@ -12,7 +13,22 @@ class SbRegionRecord:
     dat_record: DatRecord
 
     def __post_init__(self):
-        if self.dat_record.identifier == b'\xfa\xfa':
+
+        if self.dat_record.identifier == 64250:
+            r = FafaSbregions.from_bytes(self.dat_record.record.record_buffer)
+        else:
+            return
+
+        if self.language_type == "Rung NT":
+
+        query: str = "INSERT INTO comps VALUES (?, ?, ?, ?, ?, ?)"
+        entry: tuple = (
+            r.header.object_id, r.header.parent_id, r.header.record_name, r.header.seq_number, r.header.record_type,
+            r.record_buffer)
+        self._cur.execute(query, entry)
+
+    def __post_init__(self):
+        if self.dat_record.identifier == 64250:
             record_length_offset = 0
             self.record_length = struct.unpack(
                 "I", self.dat_record.record[0: record_length_offset + 4]

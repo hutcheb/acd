@@ -32,7 +32,9 @@ class install(_install):
         subprocess.run(
             ["ksc", "-t", "python", "--outdir", "acd/generated/comps/", "--python-package", "acd.generated.comps",
              "resources/templates/Comps/FAFA_Comps.ksy"])
-        _install.run(self)
+        subprocess.run(
+            ["ksc", "-t", "python", "--outdir", "acd/generated/sbregion/", "--python-package", "acd.generated.sbregion",
+             "resources/templates/SbRegion/FAFA_SbRegion.ksy"])
         subprocess.run(
             ["ksc", "-t", "python", "--outdir", "acd/generated/comps/", "--python-package", "acd.generated.comps",
              "resources/templates/Comps/FDFD_Comps.ksy"])

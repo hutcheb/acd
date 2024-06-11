@@ -69,7 +69,7 @@ class ExportL5x:
 
         log.info("Getting records from ACD Comments file and storing in sqllite database")
         comments_db = DbExtract(os.path.join(self._temp_dir, "Comments.Dat")).read()
-        for record in comments_db.records:
+        for record in comments_db.records.record:
             CommentsRecord(self._cur, record)
         self._db.commit()
 
