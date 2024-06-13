@@ -37,7 +37,7 @@ class FafaComps(KaitaiStruct):
                 return self._m_record_type
 
             _pos = self._io.pos()
-            self._io.seek(2)
+            self._io.seek(6)
             self._m_record_type = self._io.read_u2le()
             self._io.seek(_pos)
             return getattr(self, '_m_record_type', None)
@@ -72,7 +72,7 @@ class FafaComps(KaitaiStruct):
                 return self._m_seq_number
 
             _pos = self._io.pos()
-            self._io.seek(0)
+            self._io.seek(4)
             self._m_seq_number = self._io.read_u2le()
             self._io.seek(_pos)
             return getattr(self, '_m_seq_number', None)

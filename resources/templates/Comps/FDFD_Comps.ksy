@@ -6,8 +6,9 @@ meta:
 seq:
   - id: header
     type: header
+    size: 155
   - id: record_buffer
-    size: record_length - 155 - 4
+    size: record_length - 155 - 8
 types:
   header:
     instances:

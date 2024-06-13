@@ -97,27 +97,27 @@ class TagBuilder(L5xElementBuilder):
         record = results[0][3]
         name = results[0][0]
 
-        hidden_offset = 8
+        hidden_offset = 12
         hidden = struct.unpack(
             "H", record[hidden_offset: hidden_offset + 2]
         )[0] == 256
 
-        one_dim_array_length_offest = 174
+        one_dim_array_length_offest = 34
         _one_dim_array_length = struct.unpack(
             "I", record[one_dim_array_length_offest: one_dim_array_length_offest + 4]
         )[0]
 
-        two_dim_array_length_offest = 178
+        two_dim_array_length_offest = 38
         _two_dim_array_length = struct.unpack(
             "I", record[two_dim_array_length_offest: two_dim_array_length_offest + 4]
         )[0]
 
-        three_dim_array_length_offest = 182
+        three_dim_array_length_offest = 42
         _three_dim_array_length = struct.unpack(
             "I", record[three_dim_array_length_offest: three_dim_array_length_offest + 4]
         )[0]
 
-        data_type_offest = 190
+        data_type_offest = 50
         data_type_id = struct.unpack(
             "I", record[data_type_offest: data_type_offest + 4]
         )[0]

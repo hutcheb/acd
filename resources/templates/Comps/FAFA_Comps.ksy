@@ -15,10 +15,10 @@ types:
   header:
      instances:
       seq_number:
-        pos: 0x00
+        pos: 0x04
         type: u2
       record_type:
-        pos: 0x02
+        pos: 0x06
         type: u2
       object_id:
         pos: 0x0C

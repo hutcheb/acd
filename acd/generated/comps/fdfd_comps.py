@@ -16,8 +16,10 @@ class FdfdComps(KaitaiStruct):
         self._read()
 
     def _read(self):
-        self.header = FdfdComps.Header(self._io, self, self._root)
-        self.record_buffer = self._io.read_bytes(((self.record_length - 155) - 4))
+        self._raw_header = self._io.read_bytes(155)
+        _io__raw_header = KaitaiStream(BytesIO(self._raw_header))
+        self.header = FdfdComps.Header(_io__raw_header, self, self._root)
+        self.record_buffer = self._io.read_bytes(((self.record_length - 155) - 8))
 
     class Header(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):

@@ -74,8 +74,8 @@ class ExportL5x:
         self._db.commit()
 
         log.info("Getting records from ACD Nameless file and storing in sqllite database")
-        nameless_db = DbExtract(os.path.join(self._temp_dir, "Nameless.Dat"))
-        for record in nameless_db.records:
+        nameless_db = DbExtract(os.path.join(self._temp_dir, "Nameless.Dat")).read()
+        for record in nameless_db.records.record:
             NamelessRecord(self._cur, record)
         self._db.commit()
 

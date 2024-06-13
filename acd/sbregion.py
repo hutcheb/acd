@@ -29,6 +29,9 @@ class SbRegionRecord:
             self._cur.execute(query, entry)
         elif r.header.language_type == "REGION AST":
             pass
+        else:
+            pass
+
 
     def replace_tag_references(self, sb_rec):
         m = re.findall("@[A-Za-z0-9]*@", sb_rec)
