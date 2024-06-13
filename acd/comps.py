@@ -33,9 +33,12 @@ class CompsRecord:
         else:
             return
 
+        query: str = f"DELETE FROM comps WHERE object_id={r.header.object_id}"
+        self._cur.execute(query)
+
         query: str = "INSERT INTO comps VALUES (?, ?, ?, ?, ?, ?)"
-        ss = r.header.record_name.as_string
+        ss = r.header.record_name.value
         entry: tuple = (
-            r.header.object_id, r.header.parent_id, r.header.record_name.as_string, r.header.seq_number, r.header.record_type,
+            r.header.object_id, r.header.parent_id, r.header.record_name.value, r.header.seq_number, r.header.record_type,
             r.record_buffer)
         self._cur.execute(query, entry)

@@ -60,7 +60,7 @@ class FdfdComps(KaitaiStruct):
             self._io.seek(24)
             self._raw__m_record_name = self._io.read_bytes(124)
             _io__raw__m_record_name = KaitaiStream(BytesIO(self._raw__m_record_name))
-            self._m_record_name = FdfdComps.Unicode16(_io__raw__m_record_name, self, self._root)
+            self._m_record_name = FdfdComps.StrzUtf16(_io__raw__m_record_name, self, self._root)
             self._io.seek(_pos)
             return getattr(self, '_m_record_name', None)
 
@@ -87,7 +87,7 @@ class FdfdComps(KaitaiStruct):
             return getattr(self, '_m_parent_id', None)
 
 
-    class Unicode16(KaitaiStruct):
+    class StrzUtf16(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):
             self._io = _io
             self._parent = _parent
@@ -95,47 +95,28 @@ class FdfdComps(KaitaiStruct):
             self._read()
 
         def _read(self):
-            if self.start_ >= 0:
-                self.first = self._io.read_bytes(0)
+            self.value = (self._io.read_bytes((2 * (len(self.code_units) - 1)))).decode(u"utf-16le")
+            self.term = self._io.read_u2le()
+            if not self.term == 0:
+                raise kaitaistruct.ValidationNotEqualError(0, self.term, self._io, u"/types/strz_utf_16/seq/1")
 
-            self.c = []
+        @property
+        def code_units(self):
+            if hasattr(self, '_m_code_units'):
+                return self._m_code_units
+
+            _pos = self._io.pos()
+            self._io.seek(self._io.pos())
+            self._m_code_units = []
             i = 0
             while True:
                 _ = self._io.read_u2le()
-                self.c.append(_)
+                self._m_code_units.append(_)
                 if _ == 0:
                     break
                 i += 1
-            if self.end_ >= 0:
-                self.last = self._io.read_bytes(0)
-
-
-        @property
-        def start_(self):
-            if hasattr(self, '_m_start_'):
-                return self._m_start_
-
-            self._m_start_ = self._io.pos()
-            return getattr(self, '_m_start_', None)
-
-        @property
-        def end_(self):
-            if hasattr(self, '_m_end_'):
-                return self._m_end_
-
-            self._m_end_ = self._io.pos()
-            return getattr(self, '_m_end_', None)
-
-        @property
-        def as_string(self):
-            if hasattr(self, '_m_as_string'):
-                return self._m_as_string
-
-            _pos = self._io.pos()
-            self._io.seek(self.start_)
-            self._m_as_string = (self._io.read_bytes((self.end_ - self.start_))).decode(u"UTF-16")
             self._io.seek(_pos)
-            return getattr(self, '_m_as_string', None)
+            return getattr(self, '_m_code_units', None)
 
 
 

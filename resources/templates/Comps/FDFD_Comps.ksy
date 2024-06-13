@@ -25,31 +25,24 @@ types:
         type: u4
       record_name:
         pos: 0x18
-        type: unicode_16
+        type: strz_utf_16
         size: 124
 
-  unicode_16:
-   seq:
-     - id: first
-       size: 0
-       if: start_ >= 0
-     - id: c
-       type: u2
-       repeat: until
-       repeat-until: _ == 0
-     - id: last
-       size: 0
-       if: end_ >= 0
-   instances:
-     start_:
-       value: _io.pos
-     end_:
-       value: _io.pos
-     as_string:
-       pos: start_
-       type: str
-       size: end_ - start_
-       encoding: UTF-16
+  strz_utf_16:
+    seq:
+      - id: value
+        size: 2 * (code_units.size - 1)
+        type: str
+        encoding: utf-16le
+      - id: term
+        type: u2
+        valid: 0
+    instances:
+      code_units:
+        pos: _io.pos
+        type: u2
+        repeat: until
+        repeat-until: _ == 0
 params:
   - id: record_length
     type: u4

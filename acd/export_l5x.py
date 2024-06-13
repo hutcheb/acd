@@ -59,7 +59,7 @@ class ExportL5x:
         self._db.commit()
 
         log.info("Getting records from ACD Region Map file and storing in sqllite database")
-        #self.populate_region_map()
+        self.populate_region_map()
 
         log.info("Getting records from ACD SbRegion file and storing in sqllite database")
         sb_region_db = DbExtract(os.path.join(self._temp_dir, "SbRegion.Dat")).read()
@@ -92,15 +92,16 @@ class ExportL5x:
             return
         record = results[0][3]
 
-        identifier_offset = 218
+        identifier_offset = 70
 
+        l = len(record)
         region_length = struct.unpack(
             "I", record[identifier_offset + 4: identifier_offset + 8]
         )[0]
 
-        identifier_offset = 226
+        identifier_offset = 74
         record_length_absolute = identifier_offset + region_length
-
+        c = 0
         while identifier_offset < record_length_absolute:
             parent_id_identifier = struct.unpack(
                 "I", record[identifier_offset: identifier_offset + 4]
@@ -113,7 +114,9 @@ class ExportL5x:
             seq_identifier = struct.unpack(
                 "I", record[identifier_offset + 8: identifier_offset + 12]
             )[0]
-
+            if c > 123:
+                pass
+            c += 1
             object_id_identifier = struct.unpack(
                 "I", record[identifier_offset + 12: identifier_offset + 16]
             )[0]
@@ -123,7 +126,7 @@ class ExportL5x:
             self._cur.execute(query, enty)
             identifier_offset += 16
 
-        self._db.commit()
+            self._db.commit()
 
 
 if __name__ == "__main__":
