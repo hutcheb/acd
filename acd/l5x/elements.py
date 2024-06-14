@@ -7,6 +7,8 @@ from pathlib import Path
 from sqlite3 import Cursor
 from typing import List
 
+from acd.generated.comps.rx_tag import RxTag
+
 
 @dataclass
 class L5xElementBuilder:
@@ -94,51 +96,25 @@ class TagBuilder(L5xElementBuilder):
                 self._object_id))
         results = self._cur.fetchall()
 
-        record = results[0][3]
-        name = results[0][0]
+        r = RxTag.from_bytes(results[0][3])
 
-        hidden_offset = 12
-        hidden = struct.unpack(
-            "H", record[hidden_offset: hidden_offset + 2]
-        )[0] == 256
-
-        one_dim_array_length_offest = 34
-        _one_dim_array_length = struct.unpack(
-            "I", record[one_dim_array_length_offest: one_dim_array_length_offest + 4]
-        )[0]
-
-        two_dim_array_length_offest = 38
-        _two_dim_array_length = struct.unpack(
-            "I", record[two_dim_array_length_offest: two_dim_array_length_offest + 4]
-        )[0]
-
-        three_dim_array_length_offest = 42
-        _three_dim_array_length = struct.unpack(
-            "I", record[three_dim_array_length_offest: three_dim_array_length_offest + 4]
-        )[0]
-
-        data_type_offest = 50
-        data_type_id = struct.unpack(
-            "I", record[data_type_offest: data_type_offest + 4]
-        )[0]
-
-        if data_type_id == 4294967295:
+        if r.data_type_id == 4294967295:
             data_type = ""
         else:
             self._cur.execute(
                 "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
-                    data_type_id))
+                    r.data_type_id))
             data_type_results = self._cur.fetchall()
 
             data_type = data_type_results[0][0]
 
-        if _one_dim_array_length != 0:
-            data_type = data_type + "[" + str(_one_dim_array_length) + "]"
-        if _two_dim_array_length != 0:
-            data_type = data_type + "[" + str(_two_dim_array_length) + "]"
-        if _three_dim_array_length != 0:
-            data_type = data_type + "[" + str(_three_dim_array_length) + "]"
-        return Tag(name, hidden, data_type)
+        if r.first_array_dimension != 0:
+            data_type = data_type + "[" + str(r.first_array_dimension) + "]"
+        if r.second_array_dimension != 0:
+            data_type = data_type + "[" + str(r.second_array_dimension) + "]"
+        if r.third_array_dimension != 0:
+            data_type = data_type + "[" + str(r.third_array_dimension) + "]"
+        return Tag(r.tag_name, r.hidden, data_type)
 
 
 @dataclass
