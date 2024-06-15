@@ -17,7 +17,18 @@ class RxTag(KaitaiStruct):
     def _read(self):
         self.parent_id = self._io.read_u4le()
         self.unique_tag_identifier = self._io.read_u4le()
-        self.cip_data_type_id = self._io.read_u2le()
+        self.record_format_version = self._io.read_u2le()
+
+    @property
+    def cip_data_type(self):
+        if hasattr(self, '_m_cip_data_type'):
+            return self._m_cip_data_type
+
+        _pos = self._io.pos()
+        self._io.seek(66)
+        self._m_cip_data_type = self._io.read_u2le()
+        self._io.seek(_pos)
+        return getattr(self, '_m_cip_data_type', None)
 
     @property
     def tag_name_length(self):

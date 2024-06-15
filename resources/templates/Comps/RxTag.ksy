@@ -22,6 +22,9 @@ instances:
   tag_name_length:
     pos: 0x5A
     type: u2
+  cip_data_type:
+    pos: 0x42
+    type: u2
   tag_name:
     pos: 0x5C
     type: str
@@ -33,6 +36,6 @@ seq:
     type: u4
   - id: unique_tag_identifier
     type: u4
-  - id: cip_data_type_id
+  - id: record_format_version
     type: u2
  
