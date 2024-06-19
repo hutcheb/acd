@@ -1,0 +1,110 @@
+# This is a generated file! Please edit source .ksy file and use kaitai-struct-compiler to rebuild
+
+import kaitaistruct
+from kaitaistruct import KaitaiStruct, KaitaiStream, BytesIO
+
+
+if getattr(kaitaistruct, 'API_VERSION', (0, 9)) < (0, 9):
+    raise Exception("Incompatible Kaitai Struct Python API: 0.9 or later is required, but you have %s" % (kaitaistruct.__version__))
+
+class RxTag(KaitaiStruct):
+    def __init__(self, _io, _parent=None, _root=None):
+        self._io = _io
+        self._parent = _parent
+        self._root = _root if _root else self
+        self._read()
+
+    def _read(self):
+        self.parent_id = self._io.read_u4le()
+        self.unique_tag_identifier = self._io.read_u4le()
+        self.record_format_version = self._io.read_u2le()
+
+    @property
+    def cip_data_type(self):
+        if hasattr(self, '_m_cip_data_type'):
+            return self._m_cip_data_type
+
+        _pos = self._io.pos()
+        self._io.seek(66)
+        self._m_cip_data_type = self._io.read_u2le()
+        self._io.seek(_pos)
+        return getattr(self, '_m_cip_data_type', None)
+
+    @property
+    def tag_name_length(self):
+        if hasattr(self, '_m_tag_name_length'):
+            return self._m_tag_name_length
+
+        _pos = self._io.pos()
+        self._io.seek(90)
+        self._m_tag_name_length = self._io.read_u2le()
+        self._io.seek(_pos)
+        return getattr(self, '_m_tag_name_length', None)
+
+    @property
+    def data_type_id(self):
+        if hasattr(self, '_m_data_type_id'):
+            return self._m_data_type_id
+
+        _pos = self._io.pos()
+        self._io.seek(42)
+        self._m_data_type_id = self._io.read_u4le()
+        self._io.seek(_pos)
+        return getattr(self, '_m_data_type_id', None)
+
+    @property
+    def tag_name(self):
+        if hasattr(self, '_m_tag_name'):
+            return self._m_tag_name
+
+        _pos = self._io.pos()
+        self._io.seek(92)
+        self._m_tag_name = (self._io.read_bytes(self.tag_name_length)).decode(u"UTF-8")
+        self._io.seek(_pos)
+        return getattr(self, '_m_tag_name', None)
+
+    @property
+    def second_array_dimension(self):
+        if hasattr(self, '_m_second_array_dimension'):
+            return self._m_second_array_dimension
+
+        _pos = self._io.pos()
+        self._io.seek(30)
+        self._m_second_array_dimension = self._io.read_u4le()
+        self._io.seek(_pos)
+        return getattr(self, '_m_second_array_dimension', None)
+
+    @property
+    def first_array_dimension(self):
+        if hasattr(self, '_m_first_array_dimension'):
+            return self._m_first_array_dimension
+
+        _pos = self._io.pos()
+        self._io.seek(26)
+        self._m_first_array_dimension = self._io.read_u4le()
+        self._io.seek(_pos)
+        return getattr(self, '_m_first_array_dimension', None)
+
+    @property
+    def hidden(self):
+        if hasattr(self, '_m_hidden'):
+            return self._m_hidden
+
+        _pos = self._io.pos()
+        self._io.seek(50)
+        self._m_hidden = self._io.read_u2le()
+        self._io.seek(_pos)
+        return getattr(self, '_m_hidden', None)
+
+    @property
+    def third_array_dimension(self):
+        if hasattr(self, '_m_third_array_dimension'):
+            return self._m_third_array_dimension
+
+        _pos = self._io.pos()
+        self._io.seek(34)
+        self._m_third_array_dimension = self._io.read_u4le()
+        self._io.seek(_pos)
+        return getattr(self, '_m_third_array_dimension', None)
+
+

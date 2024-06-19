@@ -18,6 +18,6 @@ def test_extract_database_files():
     extractor.extract()
 
 
-def manual_test_dump_to_files():
-    export = ExportL5x(Path(os.path.join("..", "resources", "CuteLogix.ACD")), "")
+def test_dump_to_files():
+    export = ExportL5x(Path(os.path.join("..", "resources", "C05.ACD")), "")
     DumpCompsRecords(export._cur, 0).dump(0)
