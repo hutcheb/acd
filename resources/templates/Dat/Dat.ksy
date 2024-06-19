@@ -65,8 +65,16 @@ types:
             0xFAFA: fafa_record(record_length - 6)
             0xFDFD: fdfd_record(record_length - 6)
             0xFEFE: fefe_record
+            0xFBBF: bffb_record(record_length - 6)
 
   fafa_record:
+    params:
+      - id: record_length
+        type: u4
+    seq:
+      - id: record_buffer
+        size: record_length
+  bffb_record:
     params:
       - id: record_length
         type: u4

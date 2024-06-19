@@ -16,9 +16,17 @@ seq:
     type: u4
   - id: header
     type: header
-    size: 12
+    size: 0x0A
   - id: body
-    type: body(header.string_start_position, lookup_id)
+    size: record_length - 0x0A
+    type:
+      switch-on: header.record_type
+      cases:
+        0x01: ascii_record
+        0x0d: utf_16_record
+        0x0e: utf_16_record
+        0x17: controller_record
+
 
 types:
   header:
@@ -26,31 +34,56 @@ types:
       seq_number:
         pos: 0x00
         type: u2
-      string_length:
+      record_type:
         pos: 0x02
         type: u2
-      string_start_position:
+      sub_record_length:
         pos: 0x04
         type: u2
-      record_type:
+      parent:
         pos: 0x06
-        type: u2
-  body:
-      params:
-        - id: string_start_position
-          type: u2
-        - id: sub_record_type
-          type: u2
-      instances:
-        record_string_utf8:
-          pos: 0x2B
+        type: u4
+  ascii_record:
+      seq:
+        - id: unknown_1
+          size: 0x0D
+        - id: object_id
+          type: u4
+        - id: unknown_2
+          size: 0x0D
+        - id: record_string
           type: strz
           encoding: UTF-8
-          if:  sub_record_type == 0
-        record_string_utf16:
-          pos: 0x2E
+  utf_16_record:
+      seq:
+        - id: unknown_1
+          size: 0x08
+        - id: object_id
+          type: u4
+        - id: unknown_2
+          size: 0x06
+        - id: tag_reference
           type: strz_utf_16
-          if:  sub_record_type == 1
+        - id: unknown_3
+          size: 0x0C
+        - id: record_string
+          type: strz
+          encoding: UTF-8
+  controller_record:
+      seq:
+        - id: unknown_1
+          size: 0x08
+        - id: object_id
+          type: u4
+        - id: unknown_2
+          size: 0x04
+        - id: tag_reference
+          type: strz_utf_16
+        - id: unknown_3
+          size: 0x0C
+        - id: record_string
+          type: strz
+          encoding: UTF-8
 
   strz_utf_16:
     seq:

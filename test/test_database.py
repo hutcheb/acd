@@ -31,7 +31,7 @@ async def comps_dat():
 @pytest.fixture(scope = "module")
 def controller():
     log.level("DEBUG")
-    yield ExportL5x("../resources/Test_IO.ACD", "build/output.txt", "build").controller
+    yield ExportL5x("../resources/C05.ACD", "build/output.txt", "build").controller
 
 
 def test_open_file(sample_acd, sbregion_dat):

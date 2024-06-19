@@ -43,9 +43,9 @@ class ExportL5x:
         self._cur.execute("CREATE TABLE region_map(object_id int, parent_id int, unknown int, seq_no int, record BLOB NOT NULL)")
         log.debug("Create Comments table in sqllite db")
         self._cur.execute(
-            "CREATE TABLE comments(seq_number int, string_length int, lookup_id int, comment text, record_type int, sub_record_type int)")
-        log.debug("Create Nameless table in sqllite db")
+            "CREATE TABLE comments(seq_number int, sub_record_length int, object_id int, record_string text, record_type int, parent int)")
 
+        log.debug("Create Nameless table in sqllite db")
         self._cur.execute(
             "CREATE TABLE nameless(object_id int, parent_id int, record BLOB NOT NULL)")
 

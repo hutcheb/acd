@@ -47,6 +47,18 @@ class Dat(KaitaiStruct):
             self.record_buffer = self._io.read_bytes_full()
 
 
+    class BffbRecord(KaitaiStruct):
+        def __init__(self, record_length, _io, _parent=None, _root=None):
+            self._io = _io
+            self._parent = _parent
+            self._root = _root if _root else self
+            self.record_length = record_length
+            self._read()
+
+        def _read(self):
+            self.record_buffer = self._io.read_bytes(self.record_length)
+
+
     class Header(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):
             self._io = _io
@@ -96,7 +108,15 @@ class Dat(KaitaiStruct):
                 raise kaitaistruct.ValidationNotAnyOfError(self.identifier, self._io, u"/types/record/seq/0")
             self.record_length = self._io.read_u4le()
             _on = self.identifier
-            if _on == 64250:
+            if _on == 65278:
+                self._raw_record = self._io.read_bytes((self.record_length - 6))
+                _io__raw_record = KaitaiStream(BytesIO(self._raw_record))
+                self.record = Dat.FefeRecord(_io__raw_record, self, self._root)
+            elif _on == 64447:
+                self._raw_record = self._io.read_bytes((self.record_length - 6))
+                _io__raw_record = KaitaiStream(BytesIO(self._raw_record))
+                self.record = Dat.BffbRecord((self.record_length - 6), _io__raw_record, self, self._root)
+            elif _on == 64250:
                 self._raw_record = self._io.read_bytes((self.record_length - 6))
                 _io__raw_record = KaitaiStream(BytesIO(self._raw_record))
                 self.record = Dat.FafaRecord((self.record_length - 6), _io__raw_record, self, self._root)
@@ -104,10 +124,6 @@ class Dat(KaitaiStruct):
                 self._raw_record = self._io.read_bytes((self.record_length - 6))
                 _io__raw_record = KaitaiStream(BytesIO(self._raw_record))
                 self.record = Dat.FdfdRecord((self.record_length - 6), _io__raw_record, self, self._root)
-            elif _on == 65278:
-                self._raw_record = self._io.read_bytes((self.record_length - 6))
-                _io__raw_record = KaitaiStream(BytesIO(self._raw_record))
-                self.record = Dat.FefeRecord(_io__raw_record, self, self._root)
             else:
                 self.record = self._io.read_bytes((self.record_length - 6))
 

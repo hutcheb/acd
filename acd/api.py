@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from os import PathLike
 
+from acd.database.acd_database import AcdDatabase
 from acd.l5x.elements import Controller
 
 from acd.export_l5x import ExportL5x
@@ -98,8 +99,9 @@ class CompressAcdDatabase(Extract):
 class ExtractAcdDatabaseRecordsToFiles(ExportProject):
     """Export a Controller to a raw database record tree"""
     filename: PathLike
+    output_directory: PathLike
 
     def extract(self):
         # Implement the extraction of an ACD file
-        unzip = Unzip(self.filename)
-        unzip.write_files(self.output_directory)
+        database = AcdDatabase(self.filename, self.output_directory)
+        database.extract_to_file()

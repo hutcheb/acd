@@ -3,7 +3,7 @@ from pathlib import Path
 
 from acd.export_l5x import ExportL5x
 
-from acd import ImportProjectFromFile, Project, Extract, ExtractAcdDatabase
+from acd import ImportProjectFromFile, Project, Extract, ExtractAcdDatabase, ExtractAcdDatabaseRecordsToFiles
 from acd.l5x.elements import DumpCompsRecords
 
 
@@ -21,3 +21,5 @@ def test_extract_database_files():
 def test_dump_to_files():
     export = ExportL5x(Path(os.path.join("..", "resources", "C05.ACD")), "")
     DumpCompsRecords(export._cur, 0).dump(0)
+
+

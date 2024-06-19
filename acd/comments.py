@@ -20,21 +20,13 @@ class CommentsRecord:
             return
 
         query: str = "INSERT INTO comments VALUES (?, ?, ?, ?, ?, ?)"
-        if r.lookup_id == 1:
-            text = r.body.record_string_utf16.value
-
-        elif r.lookup_id == 0:
-            text = r.body.record_string_utf8
-        else:
-            text = ""
-
         entry: tuple = (
             r.header.seq_number,
-            r.header.string_length,
-            r.lookup_id,
-            text,
+            r.header.sub_record_length,
+            r.body.object_id,
+            r.body.record_string,
             r.header.record_type,
-            r.sub_record_type)
+            r.header.parent)
         self._cur.execute(query, entry)
 
     def replace_tag_references(self, sb_rec):
