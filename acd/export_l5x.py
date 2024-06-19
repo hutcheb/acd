@@ -68,10 +68,8 @@ class ExportL5x:
         self._db.commit()
 
         log.info("Getting records from ACD Comments file and storing in sqllite database")
-        comments_db = DbExtract(os.path.join(self._temp_dir, "Comments.Dat"))
-        for record in comments_db.records:
-            CommentsRecord(self._cur, record)
-        self._db.commit()
+        DbExtract(os.path.join(self._temp_dir, "Comments.Dat"))
+
 
         log.info("Getting records from ACD Nameless file and storing in sqllite database")
         nameless_db = DbExtract(os.path.join(self._temp_dir, "Nameless.Dat"))
