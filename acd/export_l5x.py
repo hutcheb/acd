@@ -43,8 +43,9 @@ class ExportL5x:
         self._cur.execute("CREATE TABLE region_map(object_id int, parent_id int, unknown int, seq_no int, record BLOB NOT NULL)")
         log.debug("Create Comments table in sqllite db")
         self._cur.execute(
-            "CREATE TABLE comments(object_id int, not_sure int, comment_length int, comment text, seq_no int, record_type int, record BLOB NOT NULL)")
+            "CREATE TABLE comments(seq_number int, string_length int, lookup_id int, comment text, record_type int, sub_record_type int)")
         log.debug("Create Nameless table in sqllite db")
+
         self._cur.execute(
             "CREATE TABLE nameless(object_id int, parent_id int, record BLOB NOT NULL)")
 
@@ -94,7 +95,9 @@ class ExportL5x:
 
         identifier_offset = 70
 
-        l = len(record)
+        if len(record) < (identifier_offset + 8):
+            return
+
         region_length = struct.unpack(
             "I", record[identifier_offset + 4: identifier_offset + 8]
         )[0]

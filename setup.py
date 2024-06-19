@@ -38,6 +38,9 @@ class install(_install):
         subprocess.run(
             ["ksc", "-t", "python", "--outdir", "acd/generated/comps/", "--python-package", "acd.generated.comps",
              "resources/templates/Comps/FDFD_Comps.ksy"])
+        subprocess.run(
+            ["ksc", "-t", "python", "--outdir", "acd/generated/comments/", "--python-package", "acd.generated.comments",
+             "resources/templates/Comments/FAFA_Comments.ksy"])
         _install.run(self)
         print("--------------------------------------------------------------------")
 

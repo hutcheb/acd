@@ -92,3 +92,14 @@ class CompressAcdDatabase(Extract):
     def compress(self):
         # Implement the compressing of an ACD file
         raise NotImplementedError
+
+
+@dataclass
+class ExtractAcdDatabaseRecordsToFiles(ExportProject):
+    """Export a Controller to a raw database record tree"""
+    filename: PathLike
+
+    def extract(self):
+        # Implement the extraction of an ACD file
+        unzip = Unzip(self.filename)
+        unzip.write_files(self.output_directory)
