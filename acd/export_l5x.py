@@ -117,23 +117,25 @@ class ExportL5x:
             "I", record[identifier_offset + 4: identifier_offset + 8]
         )[0]
 
-        identifier_offset = 74
-        record_length_absolute = identifier_offset + region_length
+        identifier_offset = 78
+        record_length_absolute = identifier_offset + region_length - 4
         c = 0
-        while identifier_offset < record_length_absolute:
-            object_id_identifier = struct.unpack(
+        while identifier_offset <= (record_length_absolute - 16):
+            parent_id_identifier = struct.unpack(
                 "I", record[identifier_offset: identifier_offset + 4]
             )[0]
 
-            parent_id_identifier = struct.unpack(
+            unknown_identifier = struct.unpack(
                 "I", record[identifier_offset + 4: identifier_offset + 8]
             )[0]
 
             seq_identifier = struct.unpack(
                 "I", record[identifier_offset + 8: identifier_offset + 12]
             )[0]
+            if c > 235:
+                pass
             c += 1
-            unknown_identifier = struct.unpack(
+            object_id_identifier = struct.unpack(
                 "I", record[identifier_offset + 12: identifier_offset + 16]
             )[0]
 
