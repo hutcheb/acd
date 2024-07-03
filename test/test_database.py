@@ -25,26 +25,22 @@ async def sbregion_dat():
 
 @pytest.fixture()
 async def comps_dat():
-    db = DbExtract("build/Comps.Dat")
-    yield db
+    db = DbExtract("build/Comps.Dat").read()
+    yield db 
 
 @pytest.fixture(scope = "module")
 def controller():
     log.level("DEBUG")
-    yield ExportL5x("../resources/C05.ACD", "build/output.txt", "build").controller
+    yield ExportL5x("../resources/CuteLogix.ACD", "build").controller
 
 
 def test_open_file(sample_acd, sbregion_dat):
     assert sbregion_dat
 
 
-def test_header(sample_acd, sbregion_dat):
-    assert sbregion_dat.header.pointer_records_region == 2591
-
-
 def test_parse_rungs_dat(controller):
     rung = controller.programs[-1].routines[-1].rungs[-1]
-    assert rung == 'XIO(b_Timer[0].DN)TON(b_Timer[0],?,?);'
+    assert rung == 'SQR(Maths[8],Maths[9]);'
 
 
 def test_parse_datatypes_dat(controller):

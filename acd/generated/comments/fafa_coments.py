@@ -24,6 +24,10 @@ class FafaComents(KaitaiStruct):
             self._raw_body = self._io.read_bytes((self.record_length - 10))
             _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
             self.body = FafaComents.Utf16Record(_io__raw_body, self, self._root)
+        elif _on == 4:
+            self._raw_body = self._io.read_bytes((self.record_length - 10))
+            _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
+            self.body = FafaComents.AsciiRecord4(_io__raw_body, self, self._root)
         elif _on == 1:
             self._raw_body = self._io.read_bytes((self.record_length - 10))
             _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
@@ -32,7 +36,19 @@ class FafaComents(KaitaiStruct):
             self._raw_body = self._io.read_bytes((self.record_length - 10))
             _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
             self.body = FafaComents.Utf16Record(_io__raw_body, self, self._root)
+        elif _on == 3:
+            self._raw_body = self._io.read_bytes((self.record_length - 10))
+            _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
+            self.body = FafaComents.AsciiRecord(_io__raw_body, self, self._root)
         elif _on == 23:
+            self._raw_body = self._io.read_bytes((self.record_length - 10))
+            _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
+            self.body = FafaComents.ControllerRecord(_io__raw_body, self, self._root)
+        elif _on == 2:
+            self._raw_body = self._io.read_bytes((self.record_length - 10))
+            _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
+            self.body = FafaComents.AsciiRecord(_io__raw_body, self, self._root)
+        elif _on == 25:
             self._raw_body = self._io.read_bytes((self.record_length - 10))
             _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
             self.body = FafaComents.ControllerRecord(_io__raw_body, self, self._root)
@@ -66,6 +82,20 @@ class FafaComents(KaitaiStruct):
             self.unknown_1 = self._io.read_bytes(13)
             self.object_id = self._io.read_u4le()
             self.unknown_2 = self._io.read_bytes(13)
+            self.record_string = (self._io.read_bytes_term(0, False, True, True)).decode(u"UTF-8")
+
+
+    class AsciiRecord4(KaitaiStruct):
+        def __init__(self, _io, _parent=None, _root=None):
+            self._io = _io
+            self._parent = _parent
+            self._root = _root if _root else self
+            self._read()
+
+        def _read(self):
+            self.unknown_1 = self._io.read_bytes(8)
+            self.object_id = self._io.read_u4le()
+            self.unknown_2 = self._io.read_bytes(24)
             self.record_string = (self._io.read_bytes_term(0, False, True, True)).decode(u"UTF-8")
 
 

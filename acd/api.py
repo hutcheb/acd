@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from os import PathLike
 
 from acd.database.acd_database import AcdDatabase
-from acd.l5x.elements import Controller
+from acd.l5x.elements import Controller, DumpCompsRecords
 
 from acd.export_l5x import ExportL5x
 from acd.unzip import Unzip
@@ -40,7 +40,7 @@ class ImportProjectFromFile(ImportProject):
 
     def import_project(self) -> Project:
         # Import Project Interface
-        export = ExportL5x(self.filename, "")
+        export = ExportL5x(self.filename)
         return Project(export.controller)
 
 
@@ -97,7 +97,7 @@ class CompressAcdDatabase(Extract):
 
 @dataclass
 class ExtractAcdDatabaseRecordsToFiles(ExportProject):
-    """Export a Controller to a raw database record tree"""
+    """Export all ACD databases to a raw database record tree"""
     filename: PathLike
     output_directory: PathLike
 
@@ -105,3 +105,19 @@ class ExtractAcdDatabaseRecordsToFiles(ExportProject):
         # Implement the extraction of an ACD file
         database = AcdDatabase(self.filename, self.output_directory)
         database.extract_to_file()
+
+
+@dataclass
+class DumpCompsRecordsToFile(ExportProject):
+    """
+    Dump the Comps database to a folder. Each individual record can then be navigated and viewed.
+
+    :param str filename: Filename of ACD file
+    :param str output_directory: Location to store the records
+    """
+    filename: PathLike
+    output_directory: PathLike
+
+    def extract(self):
+        export = ExportL5x(self.filename)
+        DumpCompsRecords(export._cur, 0).dump(0)

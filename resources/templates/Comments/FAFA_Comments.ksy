@@ -23,9 +23,13 @@ seq:
       switch-on: header.record_type
       cases:
         0x01: ascii_record
+        0x02: ascii_record
+        0x03: ascii_record
+        0x04: ascii_record_4
         0x0d: utf_16_record
         0x0e: utf_16_record
         0x17: controller_record
+        0x19: controller_record
 
 
 types:
@@ -54,6 +58,17 @@ types:
         - id: record_string
           type: strz
           encoding: UTF-8
+  ascii_record_4:
+    seq:
+      - id: unknown_1
+        size: 0x08
+      - id: object_id
+        type: u4
+      - id: unknown_2
+        size: 0x18
+      - id: record_string
+        type: strz
+        encoding: UTF-8
   utf_16_record:
       seq:
         - id: unknown_1

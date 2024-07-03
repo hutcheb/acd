@@ -7,6 +7,7 @@ from pathlib import Path
 from sqlite3 import Cursor
 from typing import List
 
+from acd.exceptions.CompsRecordException import UnknownRxTagVersion
 from acd.generated.comps.rx_tag import RxTag
 
 
@@ -98,23 +99,35 @@ class TagBuilder(L5xElementBuilder):
 
         r = RxTag.from_bytes(results[0][3])
 
-        if r.data_type_id == 4294967295:
+        if not r.body.valid:
+            raise UnknownRxTagVersion(r.record_format_version)
+
+        if r.body.data_type == 4294967295:
             data_type = ""
+            name = ""
         else:
             self._cur.execute(
                 "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
-                    r.data_type_id))
+                    r.body.data_type))
             data_type_results = self._cur.fetchall()
-
             data_type = data_type_results[0][0]
 
-        if r.first_array_dimension != 0:
-            data_type = data_type + "[" + str(r.first_array_dimension) + "]"
-        if r.second_array_dimension != 0:
-            data_type = data_type + "[" + str(r.second_array_dimension) + "]"
-        if r.third_array_dimension != 0:
-            data_type = data_type + "[" + str(r.third_array_dimension) + "]"
-        return Tag(r.tag_name, r.hidden, data_type)
+            self._cur.execute(
+                "SELECT seq_number, sub_record_length, object_id, record_string, record_type, parent FROM comments WHERE parent=" + str(
+                    r.comment_id))
+            comment_results = self._cur.fetchall()
+            if r.body.tag_name_length == 16976:
+                pass
+            name = r.body.name
+            if len(comment_results) > 0:
+                pass
+        if r.body.dimension_1 != 0:
+            data_type = data_type + "[" + str(r.body.dimension_1) + "]"
+        if r.body.dimension_2 != 0:
+            data_type = data_type + "[" + str(r.body.dimension_2) + "]"
+        if r.body.dimension_3 != 0:
+            data_type = data_type + "[" + str(r.body.dimension_3) + "]"
+        return Tag(name, r.body.data_table_instance, data_type)
 
 
 @dataclass
@@ -322,7 +335,7 @@ class ControllerBuilder(L5xElementBuilder):
         aois: List[AOI] = []
         for result in results:
             _aoi_object_id = result[1]
-            aois.append(AOI(self._cur, _aoi_object_id))
+            aois.append(AoiBuilder(self._cur, _aoi_object_id).build())
 
         return Controller(controller_name, data_types, tags, programs, aois)
 

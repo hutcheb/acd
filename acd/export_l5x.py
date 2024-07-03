@@ -19,8 +19,8 @@ from loguru import logger as log
 @dataclass
 class ExportL5x:
     input_filename: os.PathLike
-    output_filename: str
     _temp_dir: str = "build" #tempfile.mkdtemp()
+    _controller: Controller = None
 
     def __post_init__(self):
         log.info("Creating temporary directory (if it doesn't exist to store ACD database files - " + self._temp_dir)
@@ -59,6 +59,18 @@ class ExportL5x:
             CompsRecord(self._cur, record)
         self._db.commit()
 
+        # Get a list of class ids for each collection
+        # self._cur.execute("SELECT object_id, comp_name, record FROM comps WHERE parent_id=" + str(4240912631))
+        # results = self._cur.fetchall()
+        # classes = [[]]
+        # for result in results:
+        #     name = result[1]
+        #     cip_class = hex(struct.unpack(
+        #         "H", result[2][10: 10 + 2]
+        #     )[0])
+        #     classes.append([name, cip_class])
+
+
         log.info("Getting records from ACD Region Map file and storing in sqllite database")
         self.populate_region_map()
 
@@ -80,8 +92,11 @@ class ExportL5x:
             NamelessRecord(self._cur, record)
         self._db.commit()
 
-        log.info("Creating Python Controller Object")
-        self.controller = ControllerBuilder(self._cur).build()
+    @property
+    def controller(self):
+        if self._controller is None:
+            self._controller = ControllerBuilder(self._cur).build()
+        return self._controller
 
 
     def populate_region_map(self):
@@ -106,21 +121,19 @@ class ExportL5x:
         record_length_absolute = identifier_offset + region_length
         c = 0
         while identifier_offset < record_length_absolute:
-            parent_id_identifier = struct.unpack(
+            object_id_identifier = struct.unpack(
                 "I", record[identifier_offset: identifier_offset + 4]
             )[0]
 
-            unknown_identifier = struct.unpack(
+            parent_id_identifier = struct.unpack(
                 "I", record[identifier_offset + 4: identifier_offset + 8]
             )[0]
 
             seq_identifier = struct.unpack(
                 "I", record[identifier_offset + 8: identifier_offset + 12]
             )[0]
-            if c > 123:
-                pass
             c += 1
-            object_id_identifier = struct.unpack(
+            unknown_identifier = struct.unpack(
                 "I", record[identifier_offset + 12: identifier_offset + 16]
             )[0]
 
