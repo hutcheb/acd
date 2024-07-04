@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
 from sqlite3 import Cursor
-from typing import List
+from typing import List, Tuple
 
 from acd.exceptions.CompsRecordException import UnknownRxTagVersion
 from acd.generated.comps.rx_tag import RxTag
@@ -31,6 +31,7 @@ class DataType(L5xElement):
 class Tag(L5xElement):
     data_table_instance: int
     data_type: str
+    comments: List[Tuple[str, str]]
 
 
 @dataclass
@@ -105,6 +106,7 @@ class TagBuilder(L5xElementBuilder):
         if r.body.data_type == 4294967295:
             data_type = ""
             name = r.body.name
+            comment_results = []
         else:
             self._cur.execute(
                 "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
@@ -113,11 +115,9 @@ class TagBuilder(L5xElementBuilder):
             data_type = data_type_results[0][0]
 
             self._cur.execute(
-                "SELECT seq_number, sub_record_length, object_id, record_string, record_type, parent FROM comments WHERE parent=" + str(
+                "SELECT tag_reference, record_string FROM comments WHERE parent=" + str(
                     r.comment_id))
             comment_results = self._cur.fetchall()
-            if r.body.tag_name_length == 16976:
-                pass
             name = r.body.name
             if len(comment_results) > 0:
                 pass
@@ -127,7 +127,7 @@ class TagBuilder(L5xElementBuilder):
             data_type = data_type + "[" + str(r.body.dimension_2) + "]"
         if r.body.dimension_3 != 0:
             data_type = data_type + "[" + str(r.body.dimension_3) + "]"
-        return Tag(name, r.body.data_table_instance, data_type)
+        return Tag(name, r.body.data_table_instance, data_type, comment_results)
 
 
 @dataclass

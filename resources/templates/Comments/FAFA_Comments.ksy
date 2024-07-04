@@ -26,8 +26,8 @@ seq:
         0x02: ascii_record
         0x03: ascii_record
         0x04: ascii_record_4
-        0x0d: utf_16_record
-        0x0e: utf_16_record
+        0x0d: utf_16_record(header.record_type)
+        0x0e: utf_16_record(header.record_type)
         0x17: controller_record
         0x19: controller_record
 
@@ -70,17 +70,22 @@ types:
         type: strz
         encoding: UTF-8
   utf_16_record:
+      params:
+      - id: zero_buffer_length
+        type: u4
       seq:
         - id: unknown_1
           size: 0x08
         - id: object_id
           type: u4
         - id: unknown_2
-          size: 0x06
+          size: 0x04
+        - id: len_record
+          type: u2
         - id: tag_reference
           type: strz_utf_16
         - id: unknown_3
-          size: 0x0C
+          size: zero_buffer_length
         - id: record_string
           type: strz
           encoding: UTF-8

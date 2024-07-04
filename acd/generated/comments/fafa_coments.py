@@ -23,7 +23,7 @@ class FafaComents(KaitaiStruct):
         if _on == 14:
             self._raw_body = self._io.read_bytes((self.record_length - 10))
             _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
-            self.body = FafaComents.Utf16Record(_io__raw_body, self, self._root)
+            self.body = FafaComents.Utf16Record(self.header.record_type, _io__raw_body, self, self._root)
         elif _on == 4:
             self._raw_body = self._io.read_bytes((self.record_length - 10))
             _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
@@ -35,7 +35,7 @@ class FafaComents(KaitaiStruct):
         elif _on == 13:
             self._raw_body = self._io.read_bytes((self.record_length - 10))
             _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
-            self.body = FafaComents.Utf16Record(_io__raw_body, self, self._root)
+            self.body = FafaComents.Utf16Record(self.header.record_type, _io__raw_body, self, self._root)
         elif _on == 3:
             self._raw_body = self._io.read_bytes((self.record_length - 10))
             _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
@@ -187,18 +187,20 @@ class FafaComents(KaitaiStruct):
 
 
     class Utf16Record(KaitaiStruct):
-        def __init__(self, _io, _parent=None, _root=None):
+        def __init__(self, zero_buffer_length, _io, _parent=None, _root=None):
             self._io = _io
             self._parent = _parent
             self._root = _root if _root else self
+            self.zero_buffer_length = zero_buffer_length
             self._read()
 
         def _read(self):
             self.unknown_1 = self._io.read_bytes(8)
             self.object_id = self._io.read_u4le()
-            self.unknown_2 = self._io.read_bytes(6)
+            self.unknown_2 = self._io.read_bytes(4)
+            self.len_record = self._io.read_u2le()
             self.tag_reference = FafaComents.StrzUtf16(self._io, self, self._root)
-            self.unknown_3 = self._io.read_bytes(12)
+            self.unknown_3 = self._io.read_bytes(self.zero_buffer_length)
             self.record_string = (self._io.read_bytes_term(0, False, True, True)).decode(u"UTF-8")
 
 
