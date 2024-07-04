@@ -42,7 +42,7 @@ types:
         type: u4
       data_table_instance:
         pos: 0x32
-        type: u2
+        type: u4
       cip_data_type:
         pos: 0x42
         type: u2
@@ -75,18 +75,23 @@ types:
         type: u4
       data_table_instance:
         pos: 0x32
-        type: u2
+        type: u4
       cip_data_type:
         pos: 0x42
         type: u2
-      number_of_records:
+      num_records:
         pos: 0x4E
         type: u4
+      records:
+        pos: 0x4E
+        type: v63_records
+        repeat: expr
+        repeat-expr: num_records
       tag_name_length:
-        pos: 0x4E + (0xC * number_of_records)
+        pos: 0x4E + (0xC * num_records)
         type: u2
       name:
-        pos: 0x4E + (0xC * number_of_records) + 2
+        pos: 0x4E + (0xC * num_records) + 2
         type: str
         size: tag_name_length
         encoding: UTF-8
@@ -94,6 +99,14 @@ types:
         pos: 0x29A
         type: logical_path
 
+  v63_records:
+    seq:
+      - id: unknown_0
+        type: u4
+      - id: unknown_1
+        type: u4
+      - id: unknown_2
+        type: u4
   logical_path:
     seq:
       - id: position_0

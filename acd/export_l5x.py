@@ -132,8 +132,7 @@ class ExportL5x:
             seq_identifier = struct.unpack(
                 "I", record[identifier_offset + 8: identifier_offset + 12]
             )[0]
-            if c > 235:
-                pass
+
             c += 1
             object_id_identifier = struct.unpack(
                 "I", record[identifier_offset + 12: identifier_offset + 16]

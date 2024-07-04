@@ -20,7 +20,7 @@ class SbRegionRecord:
             return
 
         if r.header.language_type == "Rung NT":
-            text = r.record_buffer.decode("utf-16-le")
+            text = r.record_buffer.decode("utf-16-le").rstrip('\x00')
             self.text = self.replace_tag_references(text)
 
             query: str = "INSERT INTO rungs VALUES (?, ?, ?)"

@@ -27,7 +27,7 @@ class RxTag(KaitaiStruct):
         else:
             self.body = RxTag.VUnknown(self._io, self, self._root)
 
-    class VUnknown(KaitaiStruct):
+    class V63(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):
             self._io = _io
             self._parent = _parent
@@ -38,12 +38,136 @@ class RxTag(KaitaiStruct):
             pass
 
         @property
+        def cip_data_type(self):
+            if hasattr(self, '_m_cip_data_type'):
+                return self._m_cip_data_type
+
+            _pos = self._io.pos()
+            self._io.seek(66)
+            self._m_cip_data_type = self._io.read_u2le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_cip_data_type', None)
+
+        @property
+        def tag_name_length(self):
+            if hasattr(self, '_m_tag_name_length'):
+                return self._m_tag_name_length
+
+            _pos = self._io.pos()
+            self._io.seek((78 + (12 * self.num_records)))
+            self._m_tag_name_length = self._io.read_u2le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_tag_name_length', None)
+
+        @property
+        def data_type(self):
+            if hasattr(self, '_m_data_type'):
+                return self._m_data_type
+
+            _pos = self._io.pos()
+            self._io.seek(42)
+            self._m_data_type = self._io.read_u4le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_data_type', None)
+
+        @property
+        def dimension_2(self):
+            if hasattr(self, '_m_dimension_2'):
+                return self._m_dimension_2
+
+            _pos = self._io.pos()
+            self._io.seek(30)
+            self._m_dimension_2 = self._io.read_u4le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_dimension_2', None)
+
+        @property
+        def dimension_3(self):
+            if hasattr(self, '_m_dimension_3'):
+                return self._m_dimension_3
+
+            _pos = self._io.pos()
+            self._io.seek(34)
+            self._m_dimension_3 = self._io.read_u4le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_dimension_3', None)
+
+        @property
         def valid(self):
             if hasattr(self, '_m_valid'):
                 return self._m_valid
 
-            self._m_valid = False
+            self._m_valid = True
             return getattr(self, '_m_valid', None)
+
+        @property
+        def logical_path(self):
+            if hasattr(self, '_m_logical_path'):
+                return self._m_logical_path
+
+            _pos = self._io.pos()
+            self._io.seek(666)
+            self._m_logical_path = RxTag.LogicalPath(self._io, self, self._root)
+            self._io.seek(_pos)
+            return getattr(self, '_m_logical_path', None)
+
+        @property
+        def num_records(self):
+            if hasattr(self, '_m_num_records'):
+                return self._m_num_records
+
+            _pos = self._io.pos()
+            self._io.seek(78)
+            self._m_num_records = self._io.read_u4le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_num_records', None)
+
+        @property
+        def name(self):
+            if hasattr(self, '_m_name'):
+                return self._m_name
+
+            _pos = self._io.pos()
+            self._io.seek(((78 + (12 * self.num_records)) + 2))
+            self._m_name = (self._io.read_bytes(self.tag_name_length)).decode(u"UTF-8")
+            self._io.seek(_pos)
+            return getattr(self, '_m_name', None)
+
+        @property
+        def dimension_1(self):
+            if hasattr(self, '_m_dimension_1'):
+                return self._m_dimension_1
+
+            _pos = self._io.pos()
+            self._io.seek(26)
+            self._m_dimension_1 = self._io.read_u4le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_dimension_1', None)
+
+        @property
+        def records(self):
+            if hasattr(self, '_m_records'):
+                return self._m_records
+
+            _pos = self._io.pos()
+            self._io.seek(78)
+            self._m_records = []
+            for i in range(self.num_records):
+                self._m_records.append(RxTag.V63Records(self._io, self, self._root))
+
+            self._io.seek(_pos)
+            return getattr(self, '_m_records', None)
+
+        @property
+        def data_table_instance(self):
+            if hasattr(self, '_m_data_table_instance'):
+                return self._m_data_table_instance
+
+            _pos = self._io.pos()
+            self._io.seek(50)
+            self._m_data_table_instance = self._io.read_u4le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_data_table_instance', None)
 
 
     class V60(KaitaiStruct):
@@ -159,136 +283,7 @@ class RxTag(KaitaiStruct):
 
             _pos = self._io.pos()
             self._io.seek(50)
-            self._m_data_table_instance = self._io.read_u2le()
-            self._io.seek(_pos)
-            return getattr(self, '_m_data_table_instance', None)
-
-
-    class V63(KaitaiStruct):
-        def __init__(self, _io, _parent=None, _root=None):
-            self._io = _io
-            self._parent = _parent
-            self._root = _root if _root else self
-            self._read()
-
-        def _read(self):
-            pass
-
-        @property
-        def cip_data_type(self):
-            if hasattr(self, '_m_cip_data_type'):
-                return self._m_cip_data_type
-
-            _pos = self._io.pos()
-            self._io.seek(66)
-            self._m_cip_data_type = self._io.read_u2le()
-            self._io.seek(_pos)
-            return getattr(self, '_m_cip_data_type', None)
-
-        @property
-        def tag_name_length(self):
-            if hasattr(self, '_m_tag_name_length'):
-                return self._m_tag_name_length
-
-            _pos = self._io.pos()
-            self._io.seek((78 + (12 * self.number_of_records)))
-            self._m_tag_name_length = self._io.read_u2le()
-            self._io.seek(_pos)
-            return getattr(self, '_m_tag_name_length', None)
-
-        @property
-        def data_type(self):
-            if hasattr(self, '_m_data_type'):
-                return self._m_data_type
-
-            _pos = self._io.pos()
-            self._io.seek(42)
-            self._m_data_type = self._io.read_u4le()
-            self._io.seek(_pos)
-            return getattr(self, '_m_data_type', None)
-
-        @property
-        def dimension_2(self):
-            if hasattr(self, '_m_dimension_2'):
-                return self._m_dimension_2
-
-            _pos = self._io.pos()
-            self._io.seek(30)
-            self._m_dimension_2 = self._io.read_u4le()
-            self._io.seek(_pos)
-            return getattr(self, '_m_dimension_2', None)
-
-        @property
-        def dimension_3(self):
-            if hasattr(self, '_m_dimension_3'):
-                return self._m_dimension_3
-
-            _pos = self._io.pos()
-            self._io.seek(34)
-            self._m_dimension_3 = self._io.read_u4le()
-            self._io.seek(_pos)
-            return getattr(self, '_m_dimension_3', None)
-
-        @property
-        def valid(self):
-            if hasattr(self, '_m_valid'):
-                return self._m_valid
-
-            self._m_valid = True
-            return getattr(self, '_m_valid', None)
-
-        @property
-        def logical_path(self):
-            if hasattr(self, '_m_logical_path'):
-                return self._m_logical_path
-
-            _pos = self._io.pos()
-            self._io.seek(666)
-            self._m_logical_path = RxTag.LogicalPath(self._io, self, self._root)
-            self._io.seek(_pos)
-            return getattr(self, '_m_logical_path', None)
-
-        @property
-        def number_of_records(self):
-            if hasattr(self, '_m_number_of_records'):
-                return self._m_number_of_records
-
-            _pos = self._io.pos()
-            self._io.seek(78)
-            self._m_number_of_records = self._io.read_u4le()
-            self._io.seek(_pos)
-            return getattr(self, '_m_number_of_records', None)
-
-        @property
-        def name(self):
-            if hasattr(self, '_m_name'):
-                return self._m_name
-
-            _pos = self._io.pos()
-            self._io.seek(((78 + (12 * self.number_of_records)) + 2))
-            self._m_name = (self._io.read_bytes(self.tag_name_length)).decode(u"UTF-8")
-            self._io.seek(_pos)
-            return getattr(self, '_m_name', None)
-
-        @property
-        def dimension_1(self):
-            if hasattr(self, '_m_dimension_1'):
-                return self._m_dimension_1
-
-            _pos = self._io.pos()
-            self._io.seek(26)
-            self._m_dimension_1 = self._io.read_u4le()
-            self._io.seek(_pos)
-            return getattr(self, '_m_dimension_1', None)
-
-        @property
-        def data_table_instance(self):
-            if hasattr(self, '_m_data_table_instance'):
-                return self._m_data_table_instance
-
-            _pos = self._io.pos()
-            self._io.seek(50)
-            self._m_data_table_instance = self._io.read_u2le()
+            self._m_data_table_instance = self._io.read_u4le()
             self._io.seek(_pos)
             return getattr(self, '_m_data_table_instance', None)
 
@@ -306,6 +301,38 @@ class RxTag(KaitaiStruct):
             self.position_2 = self._io.read_u4le()
             self.position_3 = self._io.read_u4le()
             self.position_4 = self._io.read_u4le()
+
+
+    class VUnknown(KaitaiStruct):
+        def __init__(self, _io, _parent=None, _root=None):
+            self._io = _io
+            self._parent = _parent
+            self._root = _root if _root else self
+            self._read()
+
+        def _read(self):
+            pass
+
+        @property
+        def valid(self):
+            if hasattr(self, '_m_valid'):
+                return self._m_valid
+
+            self._m_valid = False
+            return getattr(self, '_m_valid', None)
+
+
+    class V63Records(KaitaiStruct):
+        def __init__(self, _io, _parent=None, _root=None):
+            self._io = _io
+            self._parent = _parent
+            self._root = _root if _root else self
+            self._read()
+
+        def _read(self):
+            self.unknown_0 = self._io.read_u4le()
+            self.unknown_1 = self._io.read_u4le()
+            self.unknown_2 = self._io.read_u4le()
 
 
 

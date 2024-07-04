@@ -29,7 +29,7 @@ class DataType(L5xElement):
 
 @dataclass
 class Tag(L5xElement):
-    hidden: int
+    data_table_instance: int
     data_type: str
 
 
@@ -104,7 +104,7 @@ class TagBuilder(L5xElementBuilder):
 
         if r.body.data_type == 4294967295:
             data_type = ""
-            name = ""
+            name = r.body.name
         else:
             self._cur.execute(
                 "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
