@@ -54,7 +54,7 @@ class RxTag(KaitaiStruct):
                 return self._m_tag_name_length
 
             _pos = self._io.pos()
-            self._io.seek((78 + (12 * self.num_records)))
+            self._io.seek((78 + (len(self.records) * 4)))
             self._m_tag_name_length = self._io.read_u2le()
             self._io.seek(_pos)
             return getattr(self, '_m_tag_name_length', None)
@@ -101,6 +101,17 @@ class RxTag(KaitaiStruct):
             return getattr(self, '_m_valid', None)
 
         @property
+        def sub_record_length(self):
+            if hasattr(self, '_m_sub_record_length'):
+                return self._m_sub_record_length
+
+            _pos = self._io.pos()
+            self._io.seek((78 + (len(self.records) * 4)))
+            self._m_sub_record_length = self._io.read_u4le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_sub_record_length', None)
+
+        @property
         def logical_path(self):
             if hasattr(self, '_m_logical_path'):
                 return self._m_logical_path
@@ -112,23 +123,12 @@ class RxTag(KaitaiStruct):
             return getattr(self, '_m_logical_path', None)
 
         @property
-        def num_records(self):
-            if hasattr(self, '_m_num_records'):
-                return self._m_num_records
-
-            _pos = self._io.pos()
-            self._io.seek(78)
-            self._m_num_records = self._io.read_u4le()
-            self._io.seek(_pos)
-            return getattr(self, '_m_num_records', None)
-
-        @property
         def name(self):
             if hasattr(self, '_m_name'):
                 return self._m_name
 
             _pos = self._io.pos()
-            self._io.seek(((78 + (12 * self.num_records)) + 2))
+            self._io.seek(((78 + (len(self.records) * 4)) + 2))
             self._m_name = (self._io.read_bytes(self.tag_name_length)).decode(u"UTF-8")
             self._io.seek(_pos)
             return getattr(self, '_m_name', None)
@@ -152,9 +152,13 @@ class RxTag(KaitaiStruct):
             _pos = self._io.pos()
             self._io.seek(78)
             self._m_records = []
-            for i in range(self.num_records):
-                self._m_records.append(RxTag.V63Records(self._io, self, self._root))
-
+            i = 0
+            while True:
+                _ = self._io.read_u4le()
+                self._m_records.append(_)
+                if _ == 590:
+                    break
+                i += 1
             self._io.seek(_pos)
             return getattr(self, '_m_records', None)
 

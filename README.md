@@ -11,6 +11,14 @@ files containing project and tag information as well as a number of database fil
 
 This library allows you to unzip all the files and extract information from these files.
 
+### Installing
+
+To install acd tools from pypi run
+
+```bash
+pip install acd-tools
+```
+
 ### Parsing the ACD file
 
 To get the Controller object and get the program/routines/rungs/tags/datatypes, use something like this

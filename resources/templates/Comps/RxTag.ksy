@@ -79,19 +79,19 @@ types:
       cip_data_type:
         pos: 0x42
         type: u2
-      num_records:
-        pos: 0x4E
-        type: u4
       records:
         pos: 0x4E
-        type: v63_records
-        repeat: expr
-        repeat-expr: num_records
+        type: u4
+        repeat: until
+        repeat-until: _ == 0x024e
+      sub_record_length:
+        pos: (0x4E + (records.size * 4))
+        type: u4
       tag_name_length:
-        pos: 0x4E + (0xC * num_records)
+        pos: (0x4E + (records.size * 4))
         type: u2
       name:
-        pos: 0x4E + (0xC * num_records) + 2
+        pos: (0x4E + (records.size * 4) + 2)
         type: str
         size: tag_name_length
         encoding: UTF-8
