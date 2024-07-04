@@ -11,7 +11,7 @@ jobs:
       - name: Download Kaitai
         run: curl -LO https://github.com/kaitai-io/kaitai_struct_compiler/releases/download/0.10/kaitai-struct-compiler_0.10_all.deb
       - name: Install Kaitai
-        run: apt-get install ./kaitai-struct-compiler_0.10_all.deb
+        run: sudo apt-get install ./kaitai-struct-compiler_0.10_all.deb
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
