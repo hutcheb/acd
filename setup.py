@@ -41,6 +41,9 @@ class install(_install):
         subprocess.run(
             ["ksc", "-t", "python", "--outdir", "acd/generated/comments/", "--python-package", "acd.generated.comments",
              "resources/templates/Comments/FAFA_Comments.ksy"])
+        subprocess.run(
+            ["ksc", "-t", "python", "--outdir", "acd/generated/controller/", "--python-package", "acd.generated.controller",
+             "resources/templates/Controller/RxController.ksy"])
         _install.run(self)
         print("--------------------------------------------------------------------")
 

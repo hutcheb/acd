@@ -15,12 +15,17 @@ seq:
     type:
       switch-on: record_format_version
       cases:
+        0: v0
         60: v60
         63: v63
         _: v_unknown
 
 types:
   v_unknown:
+    instances:
+      valid:
+        value: false
+  v0:
     instances:
       valid:
         value: false

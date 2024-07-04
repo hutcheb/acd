@@ -20,7 +20,9 @@ class RxTag(KaitaiStruct):
         self.record_format_version = self._io.read_u2le()
         self.comment_id = self._io.read_u4le()
         _on = self.record_format_version
-        if _on == 60:
+        if _on == 0:
+            self.body = RxTag.V0(self._io, self, self._root)
+        elif _on == 60:
             self.body = RxTag.V60(self._io, self, self._root)
         elif _on == 63:
             self.body = RxTag.V63(self._io, self, self._root)
@@ -305,6 +307,25 @@ class RxTag(KaitaiStruct):
             self.position_2 = self._io.read_u4le()
             self.position_3 = self._io.read_u4le()
             self.position_4 = self._io.read_u4le()
+
+
+    class V0(KaitaiStruct):
+        def __init__(self, _io, _parent=None, _root=None):
+            self._io = _io
+            self._parent = _parent
+            self._root = _root if _root else self
+            self._read()
+
+        def _read(self):
+            pass
+
+        @property
+        def valid(self):
+            if hasattr(self, '_m_valid'):
+                return self._m_valid
+
+            self._m_valid = False
+            return getattr(self, '_m_valid', None)
 
 
     class VUnknown(KaitaiStruct):

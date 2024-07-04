@@ -23,11 +23,11 @@ class FafaComents(KaitaiStruct):
         if _on == 14:
             self._raw_body = self._io.read_bytes((self.record_length - 10))
             _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
-            self.body = FafaComents.Utf16Record(self.header.record_type, _io__raw_body, self, self._root)
+            self.body = FafaComents.Utf16Record(12, _io__raw_body, self, self._root)
         elif _on == 4:
             self._raw_body = self._io.read_bytes((self.record_length - 10))
             _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
-            self.body = FafaComents.AsciiRecord4(_io__raw_body, self, self._root)
+            self.body = FafaComents.Utf16Record(12, _io__raw_body, self, self._root)
         elif _on == 1:
             self._raw_body = self._io.read_bytes((self.record_length - 10))
             _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
@@ -35,11 +35,11 @@ class FafaComents(KaitaiStruct):
         elif _on == 13:
             self._raw_body = self._io.read_bytes((self.record_length - 10))
             _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
-            self.body = FafaComents.Utf16Record(self.header.record_type, _io__raw_body, self, self._root)
+            self.body = FafaComents.Utf16Record(12, _io__raw_body, self, self._root)
         elif _on == 3:
             self._raw_body = self._io.read_bytes((self.record_length - 10))
             _io__raw_body = KaitaiStream(BytesIO(self._raw_body))
-            self.body = FafaComents.AsciiRecord(_io__raw_body, self, self._root)
+            self.body = FafaComents.Utf16Record(12, _io__raw_body, self, self._root)
         elif _on == 23:
             self._raw_body = self._io.read_bytes((self.record_length - 10))
             _io__raw_body = KaitaiStream(BytesIO(self._raw_body))

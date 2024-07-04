@@ -20,7 +20,7 @@ class CommentsRecord:
             return
 
         query: str = "INSERT INTO comments VALUES (?, ?, ?, ?, ?, ?, ?)"
-        if (r.header.record_type == 0x0D) or (r.header.record_type == 0x0E):
+        if (r.header.record_type == 0x03) or (r.header.record_type == 0x04) or (r.header.record_type == 0x0D) or (r.header.record_type == 0x0E):
             try:
                 entry: tuple = (
                     r.header.seq_number,

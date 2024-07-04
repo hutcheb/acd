@@ -24,10 +24,10 @@ seq:
       cases:
         0x01: ascii_record
         0x02: ascii_record
-        0x03: ascii_record
-        0x04: ascii_record_4
-        0x0d: utf_16_record(header.record_type)
-        0x0e: utf_16_record(header.record_type)
+        0x03: utf_16_record(0x0C)
+        0x04: utf_16_record(0x0C)
+        0x0d: utf_16_record(0x0C)
+        0x0e: utf_16_record(0x0C)
         0x17: controller_record
         0x19: controller_record
 

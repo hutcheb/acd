@@ -9,6 +9,7 @@ from typing import List, Tuple
 
 from acd.exceptions.CompsRecordException import UnknownRxTagVersion
 from acd.generated.comps.rx_tag import RxTag
+from acd.generated.controller.rx_controller import RxController
 
 
 @dataclass
@@ -53,6 +54,8 @@ class Program(L5xElement):
 
 @dataclass
 class Controller(L5xElement):
+    serial_number: str
+    path: str
     data_types: List[DataType]
     tags: List[Tag]
     programs: List[Program]
@@ -100,7 +103,9 @@ class TagBuilder(L5xElementBuilder):
 
         r = RxTag.from_bytes(results[0][3])
 
-        if not r.body.valid:
+        if r.record_format_version == 0x00:
+            return Tag(results[0][0], 0, "", [])
+        elif not r.body.valid:
             raise UnknownRxTagVersion(r.record_format_version)
 
         if r.body.data_type == 4294967295:
@@ -258,10 +263,19 @@ class ControllerBuilder(L5xElementBuilder):
 
     def build(self) -> Controller:
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=0 AND record_type=256")
+            "SELECT comp_name, object_id, parent_id, record_type, record FROM comps WHERE parent_id=0 AND record_type=256")
         results = self._cur.fetchall()
         if len(results) != 1:
             raise Exception("Does not contain exactly one root controller node")
+        serial_number = ""
+        path = ""
+        try:
+            r = RxController.from_bytes(results[0][4])
+            serial_number = hex(r.body.serial_number)
+            if r.record_format_version == 103:
+                path = r.body.path
+        except:
+            pass
 
         self._object_id = results[0][1]
         controller_name = results[0][0]
@@ -337,7 +351,7 @@ class ControllerBuilder(L5xElementBuilder):
             _aoi_object_id = result[1]
             aois.append(AoiBuilder(self._cur, _aoi_object_id).build())
 
-        return Controller(controller_name, data_types, tags, programs, aois)
+        return Controller(controller_name, serial_number, path, data_types, tags, programs, aois)
 
 @dataclass
 class DumpCompsRecords(L5xElementBuilder):
