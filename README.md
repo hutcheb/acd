@@ -9,16 +9,15 @@ that are used by RSLogix/Studio 5000.
 It consists of a number of text files containing version information, compressed XML
 files containing project and tag information as well as a number of database files.
 
-### Parsing the ACD file
+This library allows you to unzip all the files and extract information from these files.
 
-The exporting of the L5X file isn't complete, we are able to parse the data types, tags and programs into a Controller
-python object though.
+### Parsing the ACD file
 
 To get the Controller object and get the program/routines/rungs/tags/datatypes, use something like this
 ```python
-from acd.export_l5x import ExportL5x
+from acd.api import ImportProjectFromFile
 
-controller = ExportL5x("../resources/CuteLogix.ACD", "build/output.l5x").controller
+controller = ImportProjectFromFile("../resources/CuteLogix.ACD").import_project().controller
 rung = controller.programs[0].routines[0].rungs[0]
 data_type = controller.data_types[-1]
 tag_name = controller.tags[75].text
@@ -27,14 +26,38 @@ tag_data_type =  controller.tags[75].data_type
 
 ### Unzip
 
-To extract the file use the acd.unzip.Unzip class. This extracts the database files to a directory.
+To extract the file use the acd.api.ExtractAcdDatabase class. This extracts the database files to a directory.
 
 ```python
-from acd.unzip import Unzip
+from acd.api import ExtractAcdDatabase
 
-unzip = Unzip('CuteLogix.ACD')
-unzip.write_files('output_directory')
+ExtractAcdDatabase('CuteLogix.ACD', 'output_directory').extract()
+
 ```
 
+### Extract Raw Records From ACD Files
 
+A select number of database files contain interesting information. This will save each database record to a file
+to make it easier to see whats in them.
 
+```python
+from acd.api import ExtractAcdDatabaseRecordsToFiles
+
+ExtractAcdDatabaseRecordsToFiles('CuteLogix.ACD', 'output_directory').extract()
+
+```
+
+### Dump Comps Database Records
+
+The Comps database contains a lot of information and can be export as a directory structure to make it easier to look at.
+
+```python
+from acd.api import DumpCompsRecordsToFile
+
+DumpCompsRecordsToFile('CuteLogix.ACD', 'output_directory').extract()
+
+```
+
+### Converting from ACD to L5X
+
+This hasn't been started but could be feasible eventually.

@@ -7,6 +7,9 @@ from pathlib import Path
 from sqlite3 import Cursor
 from typing import List
 
+from acd.exceptions.CompsRecordException import UnknownRxTagVersion
+from acd.generated.comps.rx_tag import RxTag
+
 
 @dataclass
 class L5xElementBuilder:
@@ -26,7 +29,7 @@ class DataType(L5xElement):
 
 @dataclass
 class Tag(L5xElement):
-    hidden: int
+    data_table_instance: int
     data_type: str
 
 
@@ -94,51 +97,37 @@ class TagBuilder(L5xElementBuilder):
                 self._object_id))
         results = self._cur.fetchall()
 
-        record = results[0][3]
-        name = results[0][0]
+        r = RxTag.from_bytes(results[0][3])
 
-        hidden_offset = 8
-        hidden = struct.unpack(
-            "H", record[hidden_offset: hidden_offset + 2]
-        )[0] == 256
+        if not r.body.valid:
+            raise UnknownRxTagVersion(r.record_format_version)
 
-        one_dim_array_length_offest = 174
-        _one_dim_array_length = struct.unpack(
-            "I", record[one_dim_array_length_offest: one_dim_array_length_offest + 4]
-        )[0]
-
-        two_dim_array_length_offest = 178
-        _two_dim_array_length = struct.unpack(
-            "I", record[two_dim_array_length_offest: two_dim_array_length_offest + 4]
-        )[0]
-
-        three_dim_array_length_offest = 182
-        _three_dim_array_length = struct.unpack(
-            "I", record[three_dim_array_length_offest: three_dim_array_length_offest + 4]
-        )[0]
-
-        data_type_offest = 190
-        data_type_id = struct.unpack(
-            "I", record[data_type_offest: data_type_offest + 4]
-        )[0]
-
-        if data_type_id == 4294967295:
+        if r.body.data_type == 4294967295:
             data_type = ""
+            name = r.body.name
         else:
             self._cur.execute(
                 "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
-                    data_type_id))
+                    r.body.data_type))
             data_type_results = self._cur.fetchall()
-
             data_type = data_type_results[0][0]
 
-        if _one_dim_array_length != 0:
-            data_type = data_type + "[" + str(_one_dim_array_length) + "]"
-        if _two_dim_array_length != 0:
-            data_type = data_type + "[" + str(_two_dim_array_length) + "]"
-        if _three_dim_array_length != 0:
-            data_type = data_type + "[" + str(_three_dim_array_length) + "]"
-        return Tag(name, hidden, data_type)
+            self._cur.execute(
+                "SELECT seq_number, sub_record_length, object_id, record_string, record_type, parent FROM comments WHERE parent=" + str(
+                    r.comment_id))
+            comment_results = self._cur.fetchall()
+            if r.body.tag_name_length == 16976:
+                pass
+            name = r.body.name
+            if len(comment_results) > 0:
+                pass
+        if r.body.dimension_1 != 0:
+            data_type = data_type + "[" + str(r.body.dimension_1) + "]"
+        if r.body.dimension_2 != 0:
+            data_type = data_type + "[" + str(r.body.dimension_2) + "]"
+        if r.body.dimension_3 != 0:
+            data_type = data_type + "[" + str(r.body.dimension_3) + "]"
+        return Tag(name, r.body.data_table_instance, data_type)
 
 
 @dataclass
@@ -346,7 +335,7 @@ class ControllerBuilder(L5xElementBuilder):
         aois: List[AOI] = []
         for result in results:
             _aoi_object_id = result[1]
-            aois.append(AOI(self._cur, _aoi_object_id))
+            aois.append(AoiBuilder(self._cur, _aoi_object_id).build())
 
         return Controller(controller_name, data_types, tags, programs, aois)
 

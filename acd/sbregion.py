@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from sqlite3 import Cursor
 
 from acd.dbextract import DatRecord
+from acd.generated.sbregion.fafa_sbregions import FafaSbregions
 
 
 @dataclass
@@ -12,43 +13,25 @@ class SbRegionRecord:
     dat_record: DatRecord
 
     def __post_init__(self):
-        if self.dat_record.identifier == b'\xfa\xfa':
-            record_length_offset = 0
-            self.record_length = struct.unpack(
-                "I", self.dat_record.record[0: record_length_offset + 4]
-            )[0]
 
-            identifier_offset = 6
-            self.identifier = struct.unpack(
-                "I", self.dat_record.record[identifier_offset : identifier_offset + 4]
-            )[0]
-            language_type_record_length: int = 29
-            language_type_offset: int = 10
-            self.language_type = (
-                self.dat_record.record[
-                    language_type_offset : language_type_offset
-                    + language_type_record_length
-                ]
-                .decode("utf-8")
-                .split("\x00")[0]
-            )
-            record_length_offset = 51
-            self.record_length = struct.unpack(
-                "I", self.dat_record.record[record_length_offset : record_length_offset + 4]
-            )[0]
+        if self.dat_record.identifier == 64250:
+            r = FafaSbregions.from_bytes(self.dat_record.record.record_buffer)
+        else:
+            return
 
-            if self.language_type == "Rung NT":
-                record_offset = 55
-                self.text = self.dat_record.record[
-                    record_offset : record_offset + self.record_length - 2
-                ].decode("utf-16-le")
+        if r.header.language_type == "Rung NT":
+            text = r.record_buffer.decode("utf-16-le").rstrip('\x00')
+            self.text = self.replace_tag_references(text)
 
-                self.text = self.replace_tag_references(self.text)
+            query: str = "INSERT INTO rungs VALUES (?, ?, ?)"
+            entry: tuple = (
+                r.header.identifier, self.text, '')
+            self._cur.execute(query, entry)
+        elif r.header.language_type == "REGION AST":
+            pass
+        else:
+            pass
 
-                query: str = "INSERT INTO rungs VALUES ('" + str(self.identifier) + "', '" + self.text + "', '')"
-                self._cur.execute(query)
-            elif self.language_type == "REGION AST":
-                pass
 
     def replace_tag_references(self, sb_rec):
         m = re.findall("@[A-Za-z0-9]*@", sb_rec)

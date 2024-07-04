@@ -1,8 +1,14 @@
 import struct
 from dataclasses import dataclass
+from io import BytesIO
 from sqlite3 import Cursor
 
+from kaitaistruct import KaitaiStream
+
 from acd.dbextract import DatRecord
+from acd.generated.comps.fafa_comps import FafaComps
+from acd.generated.comps.fdfd_comps import FdfdComps
+
 
 @dataclass
 class RecordData:
@@ -20,76 +26,19 @@ class CompsRecord:
 
     def __post_init__(self):
 
-        if self.dat_record.identifier == b'\xfa\xfa':
-            # Data record
-            record_length_offset = 0
-            self.record_length = struct.unpack(
-                "I", self.dat_record.record[0 : record_length_offset + 4]
-            )[0]
-
-            seq_number_offset = 8
-            self.seq_number = struct.unpack(
-                "H", self.dat_record.record[seq_number_offset: seq_number_offset + 2]
-            )[0]
-
-            record_type_offset = 10
-            self.record_type = struct.unpack(
-                "H", self.dat_record.record[record_type_offset: record_type_offset + 2]
-            )[0]
-
-            object_id_offset = 16
-            self.object_id = struct.unpack(
-                "I", self.dat_record.record[object_id_offset : object_id_offset + 4]
-            )[0]
-
-            parent_id_offset = 20
-            self.parent_id = struct.unpack(
-                "I", self.dat_record.record[parent_id_offset: parent_id_offset + 4]
-            )[0]
-
-            text_offset = 24
-            self.text = self.dat_record.record[
-                        text_offset: text_offset + 124
-                        ].decode("utf-16-le").split("\x00")[0]
-
-            query: str = "INSERT INTO comps VALUES (?, ?, ?, ?, ?, ?)"
-            enty: tuple = (self.object_id, self.parent_id, self.text, self.seq_number, self.record_type, self.dat_record.record)
-            self._cur.execute(query, enty)
-
-
-        elif self.dat_record.identifier == b'\xfd\xfd':
-            # Pointer to Data record
-            seq_number_offset = 8
-            self.seq_number = struct.unpack(
-                "H", self.dat_record.record[seq_number_offset: seq_number_offset + 2]
-            )[0]
-
-            record_type_offset = 10
-            self.record_type = struct.unpack(
-                "H", self.dat_record.record[record_type_offset: record_type_offset + 2]
-            )[0]
-
-            object_id_offset = 16
-            self.object_id = struct.unpack(
-                "I", self.dat_record.record[object_id_offset: object_id_offset + 4]
-            )[0]
-
-            parent_id_offset = 20
-            self.parent_id = struct.unpack(
-                "I", self.dat_record.record[parent_id_offset: parent_id_offset + 4]
-            )[0]
-
-            text_offset = 24
-            self.text = self.dat_record.record[
-                        text_offset: text_offset + 124
-                        ].decode("utf-16-le").split("\x00")[0]
-
-            query: str = "INSERT INTO pointers VALUES (?, ?, ?, ?, ?, ?)"
-            enty: tuple = (self.object_id, self.parent_id, self.text, self.seq_number, self.record_type, self.dat_record.record)
-            self._cur.execute(query, enty)
-
+        if self.dat_record.identifier == 64250:
+            r = FafaComps.from_bytes(self.dat_record.record.record_buffer)
+        elif self.dat_record.identifier == 65021:
+            r = FdfdComps(self.dat_record.record_length, KaitaiStream(BytesIO(self.dat_record.record.record_buffer)))
         else:
-            self.text = ""
-            self.object_id = -1
+            return
 
+        query: str = f"DELETE FROM comps WHERE object_id={r.header.object_id}"
+        self._cur.execute(query)
 
+        query: str = "INSERT INTO comps VALUES (?, ?, ?, ?, ?, ?)"
+        ss = r.header.record_name.value
+        entry: tuple = (
+            r.header.object_id, r.header.parent_id, r.header.record_name.value, r.header.seq_number, r.header.record_type,
+            r.record_buffer)
+        self._cur.execute(query, entry)

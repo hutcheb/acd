@@ -19,8 +19,8 @@ from loguru import logger as log
 @dataclass
 class ExportL5x:
     input_filename: os.PathLike
-    output_filename: str
-    _temp_dir: str = tempfile.mkdtemp()
+    _temp_dir: str = "build" #tempfile.mkdtemp()
+    _controller: Controller = None
 
     def __post_init__(self):
         log.info("Creating temporary directory (if it doesn't exist to store ACD database files - " + self._temp_dir)
@@ -43,7 +43,8 @@ class ExportL5x:
         self._cur.execute("CREATE TABLE region_map(object_id int, parent_id int, unknown int, seq_no int, record BLOB NOT NULL)")
         log.debug("Create Comments table in sqllite db")
         self._cur.execute(
-            "CREATE TABLE comments(object_id int, not_sure int, comment_length int, comment text, seq_no int, record_type int, record BLOB NOT NULL)")
+            "CREATE TABLE comments(seq_number int, sub_record_length int, object_id int, record_string text, record_type int, parent int)")
+
         log.debug("Create Nameless table in sqllite db")
         self._cur.execute(
             "CREATE TABLE nameless(object_id int, parent_id int, record BLOB NOT NULL)")
@@ -53,32 +54,49 @@ class ExportL5x:
         unzip.write_files(self._temp_dir)
 
         log.info("Getting records from ACD Comps file and storing in sqllite database")
-        comps_db = DbExtract(os.path.join(self._temp_dir, "Comps.Dat"))
-        for record in comps_db.records:
+        comps_db = DbExtract(os.path.join(self._temp_dir, "Comps.Dat")).read()
+        for record in comps_db.records.record:
             CompsRecord(self._cur, record)
         self._db.commit()
+
+        # Get a list of class ids for each collection
+        # self._cur.execute("SELECT object_id, comp_name, record FROM comps WHERE parent_id=" + str(4240912631))
+        # results = self._cur.fetchall()
+        # classes = [[]]
+        # for result in results:
+        #     name = result[1]
+        #     cip_class = hex(struct.unpack(
+        #         "H", result[2][10: 10 + 2]
+        #     )[0])
+        #     classes.append([name, cip_class])
+
 
         log.info("Getting records from ACD Region Map file and storing in sqllite database")
         self.populate_region_map()
 
         log.info("Getting records from ACD SbRegion file and storing in sqllite database")
-        sb_region_db = DbExtract(os.path.join(self._temp_dir, "SbRegion.Dat"))
-        for record in sb_region_db.records:
+        sb_region_db = DbExtract(os.path.join(self._temp_dir, "SbRegion.Dat")).read()
+        for record in sb_region_db.records.record:
             SbRegionRecord(self._cur, record)
         self._db.commit()
 
         log.info("Getting records from ACD Comments file and storing in sqllite database")
-        DbExtract(os.path.join(self._temp_dir, "Comments.Dat"))
-
+        comments_db = DbExtract(os.path.join(self._temp_dir, "Comments.Dat")).read()
+        for record in comments_db.records.record:
+            CommentsRecord(self._cur, record)
+        self._db.commit()
 
         log.info("Getting records from ACD Nameless file and storing in sqllite database")
-        nameless_db = DbExtract(os.path.join(self._temp_dir, "Nameless.Dat"))
-        for record in nameless_db.records:
+        nameless_db = DbExtract(os.path.join(self._temp_dir, "Nameless.Dat")).read()
+        for record in nameless_db.records.record:
             NamelessRecord(self._cur, record)
         self._db.commit()
 
-        log.info("Creating Python Controller Object")
-        self.controller = ControllerBuilder(self._cur).build()
+    @property
+    def controller(self):
+        if self._controller is None:
+            self._controller = ControllerBuilder(self._cur).build()
+        return self._controller
 
 
     def populate_region_map(self):
@@ -90,16 +108,19 @@ class ExportL5x:
             return
         record = results[0][3]
 
-        identifier_offset = 218
+        identifier_offset = 70
+
+        if len(record) < (identifier_offset + 8):
+            return
 
         region_length = struct.unpack(
             "I", record[identifier_offset + 4: identifier_offset + 8]
         )[0]
 
-        identifier_offset = 226
-        record_length_absolute = identifier_offset + region_length
-
-        while identifier_offset < record_length_absolute:
+        identifier_offset = 78
+        record_length_absolute = identifier_offset + region_length - 4
+        c = 0
+        while identifier_offset <= (record_length_absolute - 16):
             parent_id_identifier = struct.unpack(
                 "I", record[identifier_offset: identifier_offset + 4]
             )[0]
@@ -112,6 +133,7 @@ class ExportL5x:
                 "I", record[identifier_offset + 8: identifier_offset + 12]
             )[0]
 
+            c += 1
             object_id_identifier = struct.unpack(
                 "I", record[identifier_offset + 12: identifier_offset + 16]
             )[0]
@@ -121,7 +143,7 @@ class ExportL5x:
             self._cur.execute(query, enty)
             identifier_offset += 16
 
-        self._db.commit()
+            self._db.commit()
 
 
 if __name__ == "__main__":
