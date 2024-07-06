@@ -62,6 +62,17 @@ class RxTag(KaitaiStruct):
             return getattr(self, '_m_tag_name_length', None)
 
         @property
+        def device_map_instance(self):
+            if hasattr(self, '_m_device_map_instance'):
+                return self._m_device_map_instance
+
+            _pos = self._io.pos()
+            self._io.seek(372)
+            self._m_device_map_instance = self._io.read_u4le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_device_map_instance', None)
+
+        @property
         def data_type(self):
             if hasattr(self, '_m_data_type'):
                 return self._m_data_type
@@ -71,6 +82,17 @@ class RxTag(KaitaiStruct):
             self._m_data_type = self._io.read_u4le()
             self._io.seek(_pos)
             return getattr(self, '_m_data_type', None)
+
+        @property
+        def data_instance(self):
+            if hasattr(self, '_m_data_instance'):
+                return self._m_data_instance
+
+            _pos = self._io.pos()
+            self._io.seek(358)
+            self._m_data_instance = self._io.read_u4le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_data_instance', None)
 
         @property
         def dimension_2(self):

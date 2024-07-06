@@ -30,6 +30,7 @@ class CommentsRecord:
                     r.header.record_type,
                     r.header.parent,
                     r.body.tag_reference.value)
+                self._cur.execute(query, entry)
             except Exception as e:
                 pass
         else:
@@ -42,9 +43,10 @@ class CommentsRecord:
                     r.header.record_type,
                     r.header.parent,
                     "")
+                self._cur.execute(query, entry)
             except Exception as e:
                 pass
-        self._cur.execute(query, entry)
+
 
     def replace_tag_references(self, sb_rec):
         m = re.findall("@[A-Za-z0-9]*@", sb_rec)

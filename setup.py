@@ -44,6 +44,10 @@ class install(_install):
         subprocess.run(
             ["ksc", "-t", "python", "--outdir", "acd/generated/controller/", "--python-package", "acd.generated.controller",
              "resources/templates/Controller/RxController.ksy"])
+        subprocess.run(
+            ["ksc", "-t", "python", "--outdir", "acd/generated/map_device/", "--python-package",
+             "acd.generated.map_device",
+             "resources/templates/MapDevice/RxMapDevice.ksy"])
         _install.run(self)
         print("--------------------------------------------------------------------")
 

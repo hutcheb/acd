@@ -5,11 +5,12 @@ from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
 from sqlite3 import Cursor
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 from acd.exceptions.CompsRecordException import UnknownRxTagVersion
 from acd.generated.comps.rx_tag import RxTag
 from acd.generated.controller.rx_controller import RxController
+from acd.generated.map_device.rx_map_device import RxMapDevice
 
 
 @dataclass
@@ -32,6 +33,17 @@ class DataType(L5xElement):
 class Tag(L5xElement):
     data_table_instance: int
     data_type: str
+    comments: List[Tuple[str, str]]
+
+
+@dataclass
+class MapDevice(L5xElement):
+    module_id: int
+    parent_module: int
+    slot_no: int
+    vendor_id: int
+    product_type: int
+    product_code: int
     comments: List[Tuple[str, str]]
 
 
@@ -60,6 +72,7 @@ class Controller(L5xElement):
     tags: List[Tag]
     programs: List[Program]
     aois: List[AOI]
+    map_devices: List[MapDevice]
 
 
 @dataclass
@@ -93,6 +106,31 @@ class DataTypeBuilder(L5xElementBuilder):
 
 
 @dataclass
+class MapDeviceBuilder(L5xElementBuilder):
+
+    def build(self) -> MapDevice:
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
+                self._object_id))
+        results = self._cur.fetchall()
+
+        r = RxMapDevice.from_bytes(results[0][3])
+
+        if r.record_format_version == 0x00:
+            return MapDevice(results[0][0], 0, 0, 0, 0, 0, [])
+        elif not r.body.valid:
+            return MapDevice("", 0, 0, 0, 0, 0, [])
+
+        self._cur.execute(
+            "SELECT tag_reference, record_string FROM comments WHERE parent=" + str(
+                r.comment_id))
+        comment_results = self._cur.fetchall()
+
+        name = results[0][0]
+        return MapDevice(name, r.body.module_id, r.body.parent_module, r.body.slot_no, r.body.vendor_id, r.body.product_type, r.body.product_code, comment_results)
+
+
+@dataclass
 class TagBuilder(L5xElementBuilder):
 
     def build(self) -> Tag:
@@ -123,7 +161,10 @@ class TagBuilder(L5xElementBuilder):
                 "SELECT tag_reference, record_string FROM comments WHERE parent=" + str(
                     r.comment_id))
             comment_results = self._cur.fetchall()
-            name = r.body.name
+            try:
+                name = r.body.name
+            except Exception as e:
+                name = ""
             if len(comment_results) > 0:
                 pass
         if r.body.dimension_1 != 0:
@@ -351,7 +392,24 @@ class ControllerBuilder(L5xElementBuilder):
             _aoi_object_id = result[1]
             aois.append(AoiBuilder(self._cur, _aoi_object_id).build())
 
-        return Controller(controller_name, serial_number, path, data_types, tags, programs, aois)
+        # Get the Map Device (IO) Collection and get the MapDevices
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
+                self._object_id) + " AND comp_name='RxMapDeviceCollection'")
+        results = self._cur.fetchall()
+        if len(results) > 1:
+            raise Exception("Contains more than one Map Device collection")
+        _map_device_collection_object_id = results[0][1]
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
+                _map_device_collection_object_id))
+        results = self._cur.fetchall()
+        map_devices: List[MapDevice] = []
+        for result in results:
+            _map_device_object_id = result[1]
+            map_devices.append(MapDeviceBuilder(self._cur, _map_device_object_id).build())
+
+        return Controller(controller_name, serial_number, path, data_types, tags, programs, aois, map_devices)
 
 @dataclass
 class DumpCompsRecords(L5xElementBuilder):

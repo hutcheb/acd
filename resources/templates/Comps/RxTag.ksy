@@ -100,6 +100,12 @@ types:
         type: str
         size: tag_name_length
         encoding: UTF-8
+      data_instance:
+        pos: 0x166
+        type: u4
+      device_map_instance:
+        pos: 0x174
+        type: u4
       logical_path:
         pos: 0x29A
         type: logical_path
