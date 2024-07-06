@@ -53,7 +53,7 @@ class install(_install):
 
 setup(
     name="acd-tools",
-    version="0.1a9",
+    version="0.2a0",
     description="Rockwell ACD File Tools",
     classifiers=[
         "Development Status :: 3 - Alpha",
