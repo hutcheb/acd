@@ -117,9 +117,9 @@ class MapDeviceBuilder(L5xElementBuilder):
         r = RxMapDevice.from_bytes(results[0][3])
 
         if r.record_format_version == 0x00:
-            return MapDevice(results[0][0], 0, 0, 0, 0, 0, [])
+            return MapDevice(results[0][0], 0, 0, 0, 0, 0, 0, [])
         elif not r.body.valid:
-            return MapDevice("", 0, 0, 0, 0, 0, [])
+            return MapDevice("", 0, 0, 0, 0, 0, 0, [])
 
         self._cur.execute(
             "SELECT tag_reference, record_string FROM comments WHERE parent=" + str(
