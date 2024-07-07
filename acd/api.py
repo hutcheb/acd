@@ -1,25 +1,23 @@
 from dataclasses import dataclass
 from os import PathLike
+from typing import List
 
 from acd.database.acd_database import AcdDatabase
-from acd.l5x.elements import Controller, DumpCompsRecords
+from acd.l5x.elements import Controller, DumpCompsRecords, RSLogix5000Content
 
 from acd.export_l5x import ExportL5x
 from acd.unzip import Unzip
 
 
 # Returned Project Structures
-@dataclass
-class Project:
-    """Controller Project"""
-    controller: Controller
+
 
 
 # Import Export Interfaces
 class ImportProject:
     """"Interface to import an PLC project"""
 
-    def import_project(self) -> Project:
+    def import_project(self) -> RSLogix5000Content:
         # Import Project Interface
         pass
 
@@ -27,7 +25,7 @@ class ImportProject:
 class ExportProject:
     """"Interface to export an PLC project"""
 
-    def export_project(self, project: Project):
+    def export_project(self, project: RSLogix5000Content):
         # Export Project Interface
         pass
 
@@ -38,10 +36,10 @@ class ImportProjectFromFile(ImportProject):
     """Import a Controller from an ACD stored on file"""
     filename: PathLike
 
-    def import_project(self) -> Project:
+    def import_project(self) -> RSLogix5000Content:
         # Import Project Interface
         export = ExportL5x(self.filename)
-        return Project(export.controller)
+        return export.project
 
 
 @dataclass
@@ -49,7 +47,7 @@ class ExportProjectToFile(ExportProject):
     """Export a Controller to an ACD file"""
     filename: PathLike
 
-    def export_project(self, project: Project):
+    def export_project(self, project: RSLogix5000Content):
         # Concreate example of exporting a Project Object to an ACD file
         raise NotImplementedError
 

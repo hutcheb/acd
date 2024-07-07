@@ -28,7 +28,6 @@ long_description = (this_directory / "README.md").read_text()
 class install(_install):
     def run(self):
         subprocess.run(["ksc", "-t", "python", "--outdir", "acd/generated/", "--python-package", "acd.generated", "resources/templates/Dat/Dat.ksy"])
-        subprocess.run(["ksc", "-t", "python", "--outdir", "acd/generated/comps/", "--python-package", "acd.generated.comps", "resources/templates/Comps/RxTag.ksy"])
         subprocess.run(
             ["ksc", "-t", "python", "--outdir", "acd/generated/comps/", "--python-package", "acd.generated.comps",
              "resources/templates/Comps/FAFA_Comps.ksy"])
@@ -42,12 +41,8 @@ class install(_install):
             ["ksc", "-t", "python", "--outdir", "acd/generated/comments/", "--python-package", "acd.generated.comments",
              "resources/templates/Comments/FAFA_Comments.ksy"])
         subprocess.run(
-            ["ksc", "-t", "python", "--outdir", "acd/generated/controller/", "--python-package", "acd.generated.controller",
-             "resources/templates/Controller/RxController.ksy"])
-        subprocess.run(
-            ["ksc", "-t", "python", "--outdir", "acd/generated/map_device/", "--python-package",
-             "acd.generated.map_device",
-             "resources/templates/MapDevice/RxMapDevice.ksy"])
+            ["ksc", "-t", "python", "--outdir", "acd/generated/comps/", "--python-package", "acd.generated.comps",
+             "resources/templates/Comps/RxGeneric.ksy"])
         _install.run(self)
         print("--------------------------------------------------------------------")
 

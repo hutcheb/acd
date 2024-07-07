@@ -4,12 +4,14 @@ import sqlite3
 import struct
 import tempfile
 from dataclasses import dataclass, field
+from datetime import datetime
 from sqlite3 import Cursor
+import xml.etree.ElementTree as ET
 
 from acd.comments import CommentsRecord
 from acd.comps import CompsRecord
 from acd.dbextract import DbExtract
-from acd.l5x.elements import Controller, ControllerBuilder
+from acd.l5x.elements import Controller, ControllerBuilder, ProjectBuilder, RSLogix5000Content
 from acd.nameless import NamelessRecord
 from acd.sbregion import SbRegionRecord
 from acd.unzip import Unzip
@@ -21,6 +23,7 @@ class ExportL5x:
     input_filename: os.PathLike
     _temp_dir: str = "build" #tempfile.mkdtemp()
     _controller: Controller = None
+    _project: RSLogix5000Content = None
 
     def __post_init__(self):
         log.info("Creating temporary directory (if it doesn't exist to store ACD database files - " + self._temp_dir)
@@ -97,6 +100,13 @@ class ExportL5x:
         if self._controller is None:
             self._controller = ControllerBuilder(self._cur).build()
         return self._controller
+
+    @property
+    def project(self):
+        if self._project is None:
+            self._project = ProjectBuilder(os.path.join(self._temp_dir, 'QuickInfo.XML')).build()
+            self._project.controller = self.controller
+        return self._project
 
 
     def populate_region_map(self):

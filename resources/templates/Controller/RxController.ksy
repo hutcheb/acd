@@ -63,18 +63,18 @@ types:
       record:
         pos: 0x4A
         size: len_record
-      len_current_active:
+      len_sfc_execution_control:
         type: u4
         pos: 0xC4
-      current_acive:
+      sfc_execution_control:
         pos: 0xC8
         type: str
         size: len_current_active
         encoding: utf-16
-      len_most_recent:
+      len_sfc_restart_position:
         type: u4
         pos: 0xE8
-      most_recent:
+      sfc_restart_position:
         pos: 0xEC
         type: str
         size: len_most_recent

@@ -33,26 +33,23 @@ types:
     instances:
       valid:
         value: true
-      record_length:
-        pos: 0x4A
-        type: u4
       vendor_id:
-        pos: 0x5C
+        pos: 0x02
         type: u2
       product_type:
-        pos: 0x5E
+        pos: 0x04
         type: u2
       product_code:
-        pos: 0x60
+        pos: 0x06
         type: u2
       parent_module:
-        pos: 0x70
+        pos: 0x16
         type: u4
       slot_no:
-        pos: 0x7A
+        pos: 0x20
         type: u4
       module_id:
-        pos: 0x7E
+        pos: 0x24
         type: u4
   v173:
     instances:
