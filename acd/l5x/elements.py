@@ -38,12 +38,15 @@ class L5xElement:
                 if isinstance(attribute_value, L5xElement):
                     child_list.append(attribute_value.to_xml())
                 elif isinstance(attribute_value, list):
-                    pass
-                    #for element in attribute_value:
-                    #    if isinstance(element, L5xElement):
-                    #        child_list.append(element.to_xml())
-                    #    else:
-                    #        child_list.append(f"<{element}/>")
+                    if attribute == "tags":
+                        new_child_list: List[str] = []
+                        for element in attribute_value:
+                            if isinstance(element, L5xElement):
+                                new_child_list.append(element.to_xml())
+                            else:
+                                new_child_list.append(f"<{element}/>")
+                        child_list.append(f'<{attribute.title().replace("_", "")}>{" ".join(new_child_list)}</{attribute.title().replace("_", "")}>')
+
                 else:
                     attribute_list.append(f'{attribute.title().replace("_", "")}="{attribute_value}"')
 
@@ -60,9 +63,12 @@ class DataType(L5xElement):
 @dataclass
 class Tag(L5xElement):
     name: str
-    data_table_instance: int
+    tag_type: str
     data_type: str
-    comments: List[Tuple[str, str]]
+    radix: str
+    external_access: str
+    _data_table_instance: int
+    _comments: List[Tuple[str, str]]
 
 
 @dataclass
@@ -204,12 +210,12 @@ class TagBuilder(L5xElementBuilder):
         try:
             r = RxGeneric.from_bytes(results[0][3])
         except Exception as e:
-            return Tag(results[0][0], results[0][0], 0, "", [])
+            return Tag(results[0][0], results[0][0], "Base", "", "Decimal", "None", 0, [])
 
         if r.cip_type != 0x6B:
-            return Tag(results[0][0], results[0][0], 0, "", [])
+            return Tag(results[0][0], results[0][0], "Base", "", "Decimal", "None", 0, [])
         if r.main_record.data_type == 0xFFFFFFFF:
-            return Tag(results[0][0], results[0][0], r.main_record.data_table_instance, "", [])
+            return Tag(results[0][0], results[0][0], "Base", "", "Decimal", "None", r.main_record.data_table_instance, [])
 
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
@@ -236,7 +242,7 @@ class TagBuilder(L5xElementBuilder):
             data_type = data_type + "[" + str(r.main_record.dimension_2) + "]"
         if r.main_record.dimension_3 != 0:
             data_type = data_type + "[" + str(r.main_record.dimension_3) + "]"
-        return Tag(name, name, r.main_record.data_table_instance, data_type, comment_results)
+        return Tag(name, name, "Base",  data_type, "Decimal", "Read/Write", r.main_record.data_table_instance, comment_results)
 
 
 @dataclass

@@ -31,4 +31,5 @@ def manual_test_to_xml():
     ss = project.to_xml()
     element = ET.XML(ss)
     ET.indent(element)
-    print(ET.tostring(element, encoding='unicode'))
+    with open(os.path.join("build", "CuteLogix.L5X"), "w") as out_file:
+        out_file.write(ET.tostring(element, encoding='unicode'))
