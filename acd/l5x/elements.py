@@ -173,7 +173,7 @@ class MapDeviceBuilder(L5xElementBuilder):
 
         self._cur.execute(
             "SELECT tag_reference, record_string FROM comments WHERE parent=" + str(
-                (r.cip_type * 0x0100) + r.comment_id))
+                (r.comment_id * 0x10000) + r.cip_type))
         comment_results = self._cur.fetchall()
 
         extended_records: Dict[int, List[int]] = {}
@@ -201,7 +201,10 @@ class TagBuilder(L5xElementBuilder):
                 self._object_id))
         results = self._cur.fetchall()
 
-        r = RxGeneric.from_bytes(results[0][3])
+        try:
+            r = RxGeneric.from_bytes(results[0][3])
+        except Exception as e:
+            return Tag(results[0][0], results[0][0], 0, "", [])
 
         if r.cip_type != 0x6B:
             return Tag(results[0][0], results[0][0], 0, "", [])
@@ -216,7 +219,7 @@ class TagBuilder(L5xElementBuilder):
 
         self._cur.execute(
             "SELECT tag_reference, record_string FROM comments WHERE parent=" + str(
-                (r.cip_type * 0x0100) + r.comment_id))
+                (r.comment_id * 0x10000) + r.cip_type))
         comment_results = self._cur.fetchall()
 
         extended_records: Dict[int, List[int]] = {}
@@ -372,7 +375,7 @@ class ControllerBuilder(L5xElementBuilder):
         r = RxGeneric.from_bytes(results[0][4])
         self._cur.execute(
             "SELECT tag_reference, record_string FROM comments WHERE parent=" + str(
-                (r.cip_type * 0x0100) + r.comment_id))
+                (r.comment_id * 0x10000) + r.cip_type))
         comment_results = self._cur.fetchall()
 
         extended_records: Dict[int, List[int]] = {}
