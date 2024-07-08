@@ -160,6 +160,17 @@ class RxGeneric(KaitaiStruct):
             return getattr(self, '_m_cip_data_type', None)
 
         @property
+        def radix(self):
+            if hasattr(self, '_m_radix'):
+                return self._m_radix
+
+            _pos = self._io.pos()
+            self._io.seek(32)
+            self._m_radix = self._io.read_u2le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_radix', None)
+
+        @property
         def data_type(self):
             if hasattr(self, '_m_data_type'):
                 return self._m_data_type
@@ -199,6 +210,17 @@ class RxGeneric(KaitaiStruct):
 
             self._m_valid = True
             return getattr(self, '_m_valid', None)
+
+        @property
+        def external_access(self):
+            if hasattr(self, '_m_external_access'):
+                return self._m_external_access
+
+            _pos = self._io.pos()
+            self._io.seek(34)
+            self._m_external_access = self._io.read_u2le()
+            self._io.seek(_pos)
+            return getattr(self, '_m_external_access', None)
 
         @property
         def dimension_1(self):

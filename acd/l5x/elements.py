@@ -1,7 +1,8 @@
 import os
 import shutil
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import Enum
 from os import PathLike
 from pathlib import Path
 from sqlite3 import Cursor
@@ -38,7 +39,7 @@ class L5xElement:
                 if isinstance(attribute_value, L5xElement):
                     child_list.append(attribute_value.to_xml())
                 elif isinstance(attribute_value, list):
-                    if attribute == "tags":
+                    if attribute == "tags" or attribute == "data_types" or attribute == "members":
                         new_child_list: List[str] = []
                         for element in attribute_value:
                             if isinstance(element, L5xElement):
@@ -48,6 +49,8 @@ class L5xElement:
                         child_list.append(f'<{attribute.title().replace("_", "")}>{" ".join(new_child_list)}</{attribute.title().replace("_", "")}>')
 
                 else:
+                    if attribute == "cls":
+                        attribute = "class"
                     attribute_list.append(f'{attribute.title().replace("_", "")}="{attribute_value}"')
 
         _export_name = self.__class__.__name__.title().replace("_", "")
@@ -55,9 +58,21 @@ class L5xElement:
 
 
 @dataclass
+class Member(L5xElement):
+    name: str
+    data_type: str
+    dimension: int
+    radix: str
+    hidden: bool
+    external_access: str
+
+
+@dataclass
 class DataType(L5xElement):
     name: str
-    children: List[str]
+    family: str
+    cls: str
+    members: List[Member]
 
 
 @dataclass
@@ -131,6 +146,85 @@ class RSLogix5000Content(L5xElement):
         self._name = "RSLogix5000Content"
 
 
+def radix_enum(i: int) -> str:
+    if i == 0:
+        return "NullType"
+    if i == 1:
+        return "General"
+    if i == 2:
+        return "Binary"
+    if i == 3:
+        return "Octal"
+    if i == 4:
+        return "Decimal"
+    if i == 5:
+        return "Hex"
+    if i == 6:
+        return "Exponential"
+    if i == 7:
+        return "Float"
+    if i == 8:
+        return "ASCII"
+    if i == 9:
+        return "Unicode"
+    if i == 10:
+        return "Date/Time"
+    if i == 11:
+        return "Date/Time (ns)"
+    if i == 12:
+        return "UseTypeStyle"
+    return "General"
+
+
+def external_access_enum(i: int) -> str:
+    if i == 0:
+        return "Read/Write"
+    if i == 1:
+        return "Read Only"
+    if i == 2:
+        return "None"
+    return "Read/Write"
+
+@dataclass
+class MemberBuilder(L5xElementBuilder):
+    record: List[int] = field(default_factory=[])
+
+    def build(self) -> Member:
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
+                self._object_id))
+        results = self._cur.fetchall()
+
+        name = results[0][0]
+        r = RxGeneric.from_bytes(results[0][3])
+        try:
+            r = RxGeneric.from_bytes(results[0][3])
+        except Exception as e:
+            return Member(name, name, "", 0, "Decimal", False, "Read/Write")
+
+        extended_records: Dict[int, List[int]] = {}
+        for extended_record in r.extended_records:
+            extended_records[extended_record.attribute_id] = extended_record.value
+        extended_records[r.last_extended_record.attribute_id] = r.last_extended_record.value
+
+        cip_data_typoe = struct.unpack_from("<I", self.record, 0x78)[0]
+        dimension = struct.unpack_from("<I", self.record, 0x5C)[0]
+        radix = radix_enum(struct.unpack_from("<I", self.record, 0x54)[0])
+        data_type_id = struct.unpack_from("<I", self.record, 0x58)[0]
+        hidden = bool(struct.unpack_from("<I", self.record, 0x70)[0])
+        external_access = external_access_enum(struct.unpack_from("<I", self.record, 0x74)[0])
+
+
+        self._cur.execute(
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
+                data_type_id))
+        data_type_results = self._cur.fetchall()
+        data_type = data_type_results[0][0]
+
+
+        return Member(name, name, data_type, dimension, radix, hidden, external_access)
+
+
 @dataclass
 class DataTypeBuilder(L5xElementBuilder):
 
@@ -140,25 +234,53 @@ class DataTypeBuilder(L5xElementBuilder):
                 self._object_id))
         results = self._cur.fetchall()
 
-        record = results[0][3]
         name = results[0][0]
+
+        try:
+            r = RxGeneric.from_bytes(results[0][3])
+        except Exception as e:
+            return DataType(name, name, "NoFamily", "User", [])
+
+        extended_records: Dict[int, List[int]] = {}
+        for extended_record in r.extended_records:
+            extended_records[extended_record.attribute_id] = extended_record.value
+        extended_records[r.last_extended_record.attribute_id] = r.last_extended_record.value
+
+        string_family_int = struct.unpack("<I", extended_records[0x6C])[0]
+        string_family = "StringFamily" if string_family_int == 1 else "NoFamily"
+
+        built_in = struct.unpack("<I", extended_records[0x67])[0]
+        module_defined = struct.unpack("<I", extended_records[0x69])[0]
+
+        class_type = "User"
+        if module_defined > 0:
+            class_type = "IO"
+        if built_in > 0:
+            class_type = "ProductDefined"
+        if len(extended_records[0x64]) == 0x04:
+            member_count = struct.unpack("<I", extended_records[0x64])[0]
+        else:
+            member_count = 0
 
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
                 self._object_id))
         member_results = self._cur.fetchall()
+        children: List[Member] = []
         if len(member_results) == 1:
             member_collection_id = member_results[0][1]
 
             self._cur.execute(
-                "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
-                    member_collection_id))
+                f"SELECT comp_name, object_id, parent_id, seq_number, record FROM comps WHERE parent_id={member_collection_id} ORDER BY seq_number")
             children_results = self._cur.fetchall()
-            children = []
-            for child in children_results:
-                children.append(child[0])
-            return DataType(name, name, children)
-        return DataType(name, name, [])
+
+            if member_count != len(children_results):
+                raise Exception("Member and children list arent the same length")
+
+            for idx, child in enumerate(children_results):
+                children.append(MemberBuilder(self._cur, child[1], extended_records[0x6E + idx]).build())
+
+        return DataType(name, name, string_family, class_type, children)
 
 
 @dataclass
@@ -236,13 +358,16 @@ class TagBuilder(L5xElementBuilder):
         name_length = struct.unpack("<H", extended_records[0x01][0:2])[0]
         name = bytes(extended_records[0x01][2:name_length+2]).decode('utf-8')
 
+        radix = radix_enum(r.main_record.radix)
+        external_access = external_access_enum(r.main_record.external_access)
+
         if r.main_record.dimension_1 != 0:
             data_type = data_type + "[" + str(r.main_record.dimension_1) + "]"
         if r.main_record.dimension_2 != 0:
             data_type = data_type + "[" + str(r.main_record.dimension_2) + "]"
         if r.main_record.dimension_3 != 0:
             data_type = data_type + "[" + str(r.main_record.dimension_3) + "]"
-        return Tag(name, name, "Base",  data_type, "Decimal", "Read/Write", r.main_record.data_table_instance, comment_results)
+        return Tag(name, name, "Base",  data_type, radix, external_access, r.main_record.data_table_instance, comment_results)
 
 
 @dataclass

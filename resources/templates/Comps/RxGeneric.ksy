@@ -64,6 +64,12 @@ types:
       data_type:
         pos: 0x1C
         type: u4
+      radix:
+        pos: 0x20
+        type: u2
+      external_access:
+        pos: 0x22
+        type: u2
       data_table_instance:
         pos: 0x24
         type: u4

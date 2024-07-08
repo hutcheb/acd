@@ -45,9 +45,9 @@ def test_parse_rungs_dat(controller):
 
 def test_parse_datatypes_dat(controller):
     data_type = controller.data_types[-1].name
-    child =  controller.data_types[-1].children[-1]
+    child =  controller.data_types[-1].members[-1]
     assert data_type == 'STRING20'
-    assert child == 'DATA'
+    assert child.name == 'DATA'
 
 
 def test_parse_tags_dat(controller):

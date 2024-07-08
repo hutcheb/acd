@@ -25,7 +25,7 @@ def test_dump_to_files():
     DumpCompsRecords(export._cur, 0).dump(0)
 
 
-def manual_test_to_xml():
+def test_to_xml():
     importer = ImportProjectFromFile(Path(os.path.join("..", "resources", "CuteLogix.ACD")))
     project: RSLogix5000Content = importer.import_project()
     ss = project.to_xml()
