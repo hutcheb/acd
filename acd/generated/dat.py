@@ -28,19 +28,19 @@ class Dat(KaitaiStruct):
             self._read()
 
         def _read(self):
-            self.record_length = self._io.read_u4le()
+            self.len_record_buffer = self._io.read_u4le()
             self.blank_1 = self._io.read_u4le()
             self.unknown_1 = self._io.read_u4le()
             self.unknown_2 = self._io.read_u4le()
-            self.record_buffer = self._io.read_bytes(self.record_length)
+            self.record_buffer = self._io.read_bytes(self.len_record_buffer)
 
 
     class FdfdRecord(KaitaiStruct):
-        def __init__(self, record_length, _io, _parent=None, _root=None):
+        def __init__(self, len_record_buffer, _io, _parent=None, _root=None):
             self._io = _io
             self._parent = _parent
             self._root = _root if _root else self
-            self.record_length = record_length
+            self.len_record_buffer = len_record_buffer
             self._read()
 
         def _read(self):
@@ -48,15 +48,15 @@ class Dat(KaitaiStruct):
 
 
     class BffbRecord(KaitaiStruct):
-        def __init__(self, record_length, _io, _parent=None, _root=None):
+        def __init__(self, len_record_buffer, _io, _parent=None, _root=None):
             self._io = _io
             self._parent = _parent
             self._root = _root if _root else self
-            self.record_length = record_length
+            self.len_record_buffer = len_record_buffer
             self._read()
 
         def _read(self):
-            self.record_buffer = self._io.read_bytes(self.record_length)
+            self.record_buffer = self._io.read_bytes(self.len_record_buffer)
 
 
     class Header(KaitaiStruct):
@@ -106,38 +106,38 @@ class Dat(KaitaiStruct):
             self.identifier = self._io.read_u2le()
             if not  ((self.identifier == 65278) or (self.identifier == 65021) or (self.identifier == 64250) or (self.identifier == 64447)) :
                 raise kaitaistruct.ValidationNotAnyOfError(self.identifier, self._io, u"/types/record/seq/0")
-            self.record_length = self._io.read_u4le()
+            self.len_record = self._io.read_u4le()
             _on = self.identifier
             if _on == 65278:
-                self._raw_record = self._io.read_bytes((self.record_length - 6))
+                self._raw_record = self._io.read_bytes((self.len_record - 6))
                 _io__raw_record = KaitaiStream(BytesIO(self._raw_record))
                 self.record = Dat.FefeRecord(_io__raw_record, self, self._root)
             elif _on == 64447:
-                self._raw_record = self._io.read_bytes((self.record_length - 6))
+                self._raw_record = self._io.read_bytes((self.len_record - 6))
                 _io__raw_record = KaitaiStream(BytesIO(self._raw_record))
-                self.record = Dat.BffbRecord((self.record_length - 6), _io__raw_record, self, self._root)
+                self.record = Dat.BffbRecord((self.len_record - 6), _io__raw_record, self, self._root)
             elif _on == 64250:
-                self._raw_record = self._io.read_bytes((self.record_length - 6))
+                self._raw_record = self._io.read_bytes((self.len_record - 6))
                 _io__raw_record = KaitaiStream(BytesIO(self._raw_record))
-                self.record = Dat.FafaRecord((self.record_length - 6), _io__raw_record, self, self._root)
+                self.record = Dat.FafaRecord((self.len_record - 6), _io__raw_record, self, self._root)
             elif _on == 65021:
-                self._raw_record = self._io.read_bytes((self.record_length - 6))
+                self._raw_record = self._io.read_bytes((self.len_record - 6))
                 _io__raw_record = KaitaiStream(BytesIO(self._raw_record))
-                self.record = Dat.FdfdRecord((self.record_length - 6), _io__raw_record, self, self._root)
+                self.record = Dat.FdfdRecord((self.len_record - 6), _io__raw_record, self, self._root)
             else:
-                self.record = self._io.read_bytes((self.record_length - 6))
+                self.record = self._io.read_bytes((self.len_record - 6))
 
 
     class FafaRecord(KaitaiStruct):
-        def __init__(self, record_length, _io, _parent=None, _root=None):
+        def __init__(self, len_record_buffer, _io, _parent=None, _root=None):
             self._io = _io
             self._parent = _parent
             self._root = _root if _root else self
-            self.record_length = record_length
+            self.len_record_buffer = len_record_buffer
             self._read()
 
         def _read(self):
-            self.record_buffer = self._io.read_bytes(self.record_length)
+            self.record_buffer = self._io.read_bytes(self.len_record_buffer)
 
 
     @property

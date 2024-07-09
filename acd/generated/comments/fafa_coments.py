@@ -187,11 +187,11 @@ class FafaComents(KaitaiStruct):
 
 
     class Utf16Record(KaitaiStruct):
-        def __init__(self, zero_buffer_length, _io, _parent=None, _root=None):
+        def __init__(self, len_unknown_3, _io, _parent=None, _root=None):
             self._io = _io
             self._parent = _parent
             self._root = _root if _root else self
-            self.zero_buffer_length = zero_buffer_length
+            self.len_unknown_3 = len_unknown_3
             self._read()
 
         def _read(self):
@@ -200,7 +200,7 @@ class FafaComents(KaitaiStruct):
             self.unknown_2 = self._io.read_bytes(4)
             self.len_record = self._io.read_u2le()
             self.tag_reference = FafaComents.StrzUtf16(self._io, self, self._root)
-            self.unknown_3 = self._io.read_bytes(self.zero_buffer_length)
+            self.unknown_3 = self._io.read_bytes(self.len_unknown_3)
             self.record_string = (self._io.read_bytes_term(0, False, True, True)).decode(u"UTF-8")
 
 

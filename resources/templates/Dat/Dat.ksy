@@ -55,42 +55,42 @@ types:
         type: u2
         valid:
           any-of: [0xFEFE, 0xFDFD, 0xFAFA, 0xFBBF]
-      - id: record_length
+      - id: len_record
         type: u4
       - id: record
-        size: record_length - 6
+        size: len_record - 6
         type:
           switch-on: identifier
           cases:
-            0xFAFA: fafa_record(record_length - 6)
-            0xFDFD: fdfd_record(record_length - 6)
+            0xFAFA: fafa_record(len_record - 6)
+            0xFDFD: fdfd_record(len_record - 6)
             0xFEFE: fefe_record
-            0xFBBF: bffb_record(record_length - 6)
+            0xFBBF: bffb_record(len_record - 6)
 
   fafa_record:
     params:
-      - id: record_length
+      - id: len_record_buffer
         type: u4
     seq:
       - id: record_buffer
-        size: record_length
+        size: len_record_buffer
   bffb_record:
     params:
-      - id: record_length
+      - id: len_record_buffer
         type: u4
     seq:
       - id: record_buffer
-        size: record_length
+        size: len_record_buffer
   fdfd_record:
     params:
-      - id: record_length
+      - id: len_record_buffer
         type: u4
     seq:
       - id: record_buffer
         size-eos: true
   fefe_record:
     seq:
-      - id: record_length
+      - id: len_record_buffer
         type: u4
       - id: blank_1
         type: u4
@@ -99,4 +99,4 @@ types:
       - id: unknown_2
         type: u4
       - id: record_buffer
-        size: record_length
+        size: len_record_buffer

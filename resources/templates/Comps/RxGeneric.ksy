@@ -36,18 +36,18 @@ types:
     seq:
       - id: attribute_id
         type: u4
-      - id: record_length
+      - id: len_value
         type: u4
       - id: value
-        size: record_length
+        size: len_value
   last_attribute_record:
     seq:
       - id: attribute_id
         type: u4
-      - id: record_length
+      - id: len_value
         type: u4
       - id: value
-        size: record_length - 4
+        size: len_value - 4
   rx_tag:
     instances:
       valid:

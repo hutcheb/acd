@@ -7,6 +7,8 @@ from acd.export_l5x import ExportL5x
 
 from acd.l5x.elements import DumpCompsRecords
 import xml.etree.ElementTree as ET
+from xml.dom import minidom
+
 
 
 def test_import_from_file():
@@ -28,8 +30,7 @@ def test_dump_to_files():
 def test_to_xml():
     importer = ImportProjectFromFile(Path(os.path.join("..", "resources", "CuteLogix.ACD")))
     project: RSLogix5000Content = importer.import_project()
-    ss = project.to_xml()
-    element = ET.XML(ss)
-    ET.indent(element)
+    unformatted_string = project.to_xml()
+    xmlstr = minidom.parseString(unformatted_string).toprettyxml(indent="   ")
     with open(os.path.join("build", "CuteLogix.L5X"), "w") as out_file:
-        out_file.write(ET.tostring(element, encoding='unicode'))
+        out_file.write(xmlstr)

@@ -46,7 +46,7 @@ class L5xElement:
                                 new_child_list.append(element.to_xml())
                             else:
                                 new_child_list.append(f"<{element}/>")
-                        child_list.append(f'<{attribute.title().replace("_", "")}>{" ".join(new_child_list)}</{attribute.title().replace("_", "")}>')
+                        child_list.append(f'<{attribute.title().replace("_", "")}>{"".join(new_child_list)}</{attribute.title().replace("_", "")}>')
 
                 else:
                     if attribute == "cls":
@@ -54,7 +54,7 @@ class L5xElement:
                     attribute_list.append(f'{attribute.title().replace("_", "")}="{attribute_value}"')
 
         _export_name = self.__class__.__name__.title().replace("_", "")
-        return f'<{_export_name} {" ".join(attribute_list)}>{" ".join(child_list)}</{_export_name}>'
+        return f'<{_export_name} {" ".join(attribute_list)}>{"".join(child_list)}</{_export_name}>'
 
 
 @dataclass
@@ -117,7 +117,7 @@ class Program(L5xElement):
 @dataclass
 class Controller(L5xElement):
     serial_number: str
-    path: str
+    comm_path: str
     sfc_execution_control: str
     sfc_restart_position: str
     sfc_last_scan: str
@@ -177,13 +177,15 @@ def radix_enum(i: int) -> str:
 
 
 def external_access_enum(i: int) -> str:
+    default = "Read/Write"
     if i == 0:
-        return "Read/Write"
+        return default
     if i == 1:
         return "Read Only"
     if i == 2:
         return "None"
-    return "Read/Write"
+    return default
+
 
 @dataclass
 class MemberBuilder(L5xElementBuilder):
@@ -514,12 +516,14 @@ class ControllerBuilder(L5xElementBuilder):
             extended_records[extended_record.attribute_id] = extended_record.value
         extended_records[r.last_extended_record.attribute_id] = r.last_extended_record.value
 
-        path = bytes(extended_records[0x6a][:-2]).decode('utf-16')
+        comm_path = bytes(extended_records[0x6a][:-2]).decode('utf-16')
         sfc_execution_control = bytes(extended_records[0x6F][:-2]).decode('utf-16')
         sfc_restart_position = bytes(extended_records[0x70][:-2]).decode('utf-16')
         sfc_last_scan = bytes(extended_records[0x71][:-2]).decode('utf-16')
 
-        serial_number = hex(struct.unpack("<I", extended_records[0x75])[0])
+        serial_number_raw = hex(struct.unpack("<I", extended_records[0x75])[0])[2:].zfill(8)
+        serial_number = f"16#{serial_number_raw[:4].upper()}_{serial_number_raw[4:].upper()}"
+
         raw_modified_date = struct.unpack("<Q", extended_records[0x66])[0]/10000000
         epoch_modified_date = datetime(1601, 1, 1) + timedelta(seconds=raw_modified_date)
         modified_date = epoch_modified_date.strftime("%a %b %d %H:%M:%S %Y")
@@ -619,7 +623,7 @@ class ControllerBuilder(L5xElementBuilder):
             _map_device_object_id = result[1]
             map_devices.append(MapDeviceBuilder(self._cur, _map_device_object_id).build())
 
-        return Controller(controller_name, serial_number, path, sfc_execution_control, sfc_restart_position, sfc_last_scan, created_date, modified_date, data_types, tags, programs, aois, map_devices)
+        return Controller(controller_name, serial_number, comm_path, sfc_execution_control, sfc_restart_position, sfc_last_scan, created_date, modified_date, data_types, tags, programs, aois, map_devices)
 
 @dataclass
 class ProjectBuilder:

@@ -25,6 +25,7 @@ from pathlib import Path
 this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
 
+
 class install(_install):
     def run(self):
         subprocess.run(["ksc", "-t", "python", "--outdir", "acd/generated/", "--python-package", "acd.generated", "resources/templates/Dat/Dat.ksy"])

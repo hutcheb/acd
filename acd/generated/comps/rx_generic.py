@@ -57,8 +57,8 @@ class RxGeneric(KaitaiStruct):
 
         def _read(self):
             self.attribute_id = self._io.read_u4le()
-            self.record_length = self._io.read_u4le()
-            self.value = self._io.read_bytes((self.record_length - 4))
+            self.len_value = self._io.read_u4le()
+            self.value = self._io.read_bytes((self.len_value - 4))
 
 
     class RxMapDevice(KaitaiStruct):
@@ -254,8 +254,8 @@ class RxGeneric(KaitaiStruct):
 
         def _read(self):
             self.attribute_id = self._io.read_u4le()
-            self.record_length = self._io.read_u4le()
-            self.value = self._io.read_bytes(self.record_length)
+            self.len_value = self._io.read_u4le()
+            self.value = self._io.read_bytes(self.len_value)
 
 
 

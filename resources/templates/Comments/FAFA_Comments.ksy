@@ -71,7 +71,7 @@ types:
         encoding: UTF-8
   utf_16_record:
       params:
-      - id: zero_buffer_length
+      - id: len_unknown_3
         type: u4
       seq:
         - id: unknown_1
@@ -85,7 +85,7 @@ types:
         - id: tag_reference
           type: strz_utf_16
         - id: unknown_3
-          size: zero_buffer_length
+          size: len_unknown_3
         - id: record_string
           type: strz
           encoding: UTF-8
