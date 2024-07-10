@@ -20,7 +20,12 @@ class CommentsRecord:
             return
 
         query: str = "INSERT INTO comments VALUES (?, ?, ?, ?, ?, ?, ?)"
-        if (r.header.record_type == 0x03) or (r.header.record_type == 0x04) or (r.header.record_type == 0x0D) or (r.header.record_type == 0x0E):
+        if (
+            (r.header.record_type == 0x03)
+            or (r.header.record_type == 0x04)
+            or (r.header.record_type == 0x0D)
+            or (r.header.record_type == 0x0E)
+        ):
             try:
                 entry: tuple = (
                     r.header.seq_number,
@@ -29,7 +34,8 @@ class CommentsRecord:
                     r.body.record_string,
                     r.header.record_type,
                     r.header.parent,
-                    r.body.tag_reference.value)
+                    r.body.tag_reference.value,
+                )
                 self._cur.execute(query, entry)
             except Exception as e:
                 pass
@@ -42,18 +48,20 @@ class CommentsRecord:
                     r.body.record_string,
                     r.header.record_type,
                     r.header.parent,
-                    "")
+                    "",
+                )
                 self._cur.execute(query, entry)
             except Exception as e:
                 pass
-
 
     def replace_tag_references(self, sb_rec):
         m = re.findall("@[A-Za-z0-9]*@", sb_rec)
         for tag in m:
             tag_no = tag[1:-1]
             tag_id = int(tag_no, 16)
-            self._cur.execute("SELECT object_id, comp_name FROM comps WHERE object_id=" + str(tag_id))
+            self._cur.execute(
+                "SELECT object_id, comp_name FROM comps WHERE object_id=" + str(tag_id)
+            )
             results = self._cur.fetchall()
             sb_rec = sb_rec.replace(tag, results[0][1])
         return sb_rec

@@ -4,8 +4,12 @@ import kaitaistruct
 from kaitaistruct import KaitaiStruct, KaitaiStream, BytesIO
 
 
-if getattr(kaitaistruct, 'API_VERSION', (0, 9)) < (0, 9):
-    raise Exception("Incompatible Kaitai Struct Python API: 0.9 or later is required, but you have %s" % (kaitaistruct.__version__))
+if getattr(kaitaistruct, "API_VERSION", (0, 9)) < (0, 9):
+    raise Exception(
+        "Incompatible Kaitai Struct Python API: 0.9 or later is required, but you have %s"
+        % (kaitaistruct.__version__)
+    )
+
 
 class FafaSbregions(KaitaiStruct):
     def __init__(self, _io, _parent=None, _root=None):
@@ -30,7 +34,6 @@ class FafaSbregions(KaitaiStruct):
         def _read(self):
             self.sb_regions = self._io.read_u2le()
             self.identifier = self._io.read_u4le()
-            self.language_type = (KaitaiStream.bytes_terminate(self._io.read_bytes(41), 0, False)).decode(u"UTF-8")
-
-
-
+            self.language_type = (
+                KaitaiStream.bytes_terminate(self._io.read_bytes(41), 0, False)
+            ).decode("UTF-8")

@@ -22,30 +22,88 @@ from setuptools import setup, find_packages
 from setuptools.command.install import install as _install
 
 from pathlib import Path
+
 this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
 
 
 class install(_install):
     def run(self):
-        subprocess.run(["ksc", "-t", "python", "--outdir", "acd/generated/", "--python-package", "acd.generated", "resources/templates/Dat/Dat.ksy"])
         subprocess.run(
-            ["ksc", "-t", "python", "--outdir", "acd/generated/comps/", "--python-package", "acd.generated.comps",
-             "resources/templates/Comps/FAFA_Comps.ksy"])
+            [
+                "ksc",
+                "-t",
+                "python",
+                "--outdir",
+                "acd/generated/",
+                "--python-package",
+                "acd.generated",
+                "resources/templates/Dat/Dat.ksy",
+            ]
+        )
         subprocess.run(
-            ["ksc", "-t", "python", "--outdir", "acd/generated/sbregion/", "--python-package", "acd.generated.sbregion",
-             "resources/templates/SbRegion/FAFA_SbRegion.ksy"])
+            [
+                "ksc",
+                "-t",
+                "python",
+                "--outdir",
+                "acd/generated/comps/",
+                "--python-package",
+                "acd.generated.comps",
+                "resources/templates/Comps/FAFA_Comps.ksy",
+            ]
+        )
         subprocess.run(
-            ["ksc", "-t", "python", "--outdir", "acd/generated/comps/", "--python-package", "acd.generated.comps",
-             "resources/templates/Comps/FDFD_Comps.ksy"])
+            [
+                "ksc",
+                "-t",
+                "python",
+                "--outdir",
+                "acd/generated/sbregion/",
+                "--python-package",
+                "acd.generated.sbregion",
+                "resources/templates/SbRegion/FAFA_SbRegion.ksy",
+            ]
+        )
         subprocess.run(
-            ["ksc", "-t", "python", "--outdir", "acd/generated/comments/", "--python-package", "acd.generated.comments",
-             "resources/templates/Comments/FAFA_Comments.ksy"])
+            [
+                "ksc",
+                "-t",
+                "python",
+                "--outdir",
+                "acd/generated/comps/",
+                "--python-package",
+                "acd.generated.comps",
+                "resources/templates/Comps/FDFD_Comps.ksy",
+            ]
+        )
         subprocess.run(
-            ["ksc", "-t", "python", "--outdir", "acd/generated/comps/", "--python-package", "acd.generated.comps",
-             "resources/templates/Comps/RxGeneric.ksy"])
+            [
+                "ksc",
+                "-t",
+                "python",
+                "--outdir",
+                "acd/generated/comments/",
+                "--python-package",
+                "acd.generated.comments",
+                "resources/templates/Comments/FAFA_Comments.ksy",
+            ]
+        )
+        subprocess.run(
+            [
+                "ksc",
+                "-t",
+                "python",
+                "--outdir",
+                "acd/generated/comps/",
+                "--python-package",
+                "acd.generated.comps",
+                "resources/templates/Comps/RxGeneric.ksy",
+            ]
+        )
         _install.run(self)
         print("--------------------------------------------------------------------")
+
 
 setup(
     name="acd-tools",
@@ -63,7 +121,7 @@ setup(
     author_email="",
     license="Apache 2.0",
     long_description=long_description,
-    long_description_content_type='text/markdown',
+    long_description_content_type="text/markdown",
     packages=find_packages(include=["acd", "acd.*"]),
     setup_requires=[
         "wheel",
@@ -75,14 +133,13 @@ setup(
     extras_require={
         "dev": [
             "requires",
-            "pytest-asyncio>=0.18.3",
+            "pytest-asyncio",
             "pip-tools",
-            "pre-commit>=2.6.0",
-            "pytest-mock>=3.3.1",
-            "mock>=4.0.2",
-            "mypy>=0.942",
-            "flake8>=4.0.1",
+            "pre-commit",
+            "pytest-mock",
+            "mock",
+            "mypy",
         ]
     },
-    cmdclass={'install': install},
+    cmdclass={"install": install},
 )

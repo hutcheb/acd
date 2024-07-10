@@ -4,8 +4,12 @@ import kaitaistruct
 from kaitaistruct import KaitaiStruct, KaitaiStream, BytesIO
 
 
-if getattr(kaitaistruct, 'API_VERSION', (0, 9)) < (0, 9):
-    raise Exception("Incompatible Kaitai Struct Python API: 0.9 or later is required, but you have %s" % (kaitaistruct.__version__))
+if getattr(kaitaistruct, "API_VERSION", (0, 9)) < (0, 9):
+    raise Exception(
+        "Incompatible Kaitai Struct Python API: 0.9 or later is required, but you have %s"
+        % (kaitaistruct.__version__)
+    )
+
 
 class FafaComents(KaitaiStruct):
     def __init__(self, _io, _parent=None, _root=None):
@@ -68,8 +72,9 @@ class FafaComents(KaitaiStruct):
             self.unknown_2 = self._io.read_bytes(4)
             self.tag_reference = FafaComents.StrzUtf16(self._io, self, self._root)
             self.unknown_3 = self._io.read_bytes(12)
-            self.record_string = (self._io.read_bytes_term(0, False, True, True)).decode(u"UTF-8")
-
+            self.record_string = (
+                self._io.read_bytes_term(0, False, True, True)
+            ).decode("UTF-8")
 
     class AsciiRecord(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):
@@ -82,8 +87,9 @@ class FafaComents(KaitaiStruct):
             self.unknown_1 = self._io.read_bytes(13)
             self.object_id = self._io.read_u4le()
             self.unknown_2 = self._io.read_bytes(13)
-            self.record_string = (self._io.read_bytes_term(0, False, True, True)).decode(u"UTF-8")
-
+            self.record_string = (
+                self._io.read_bytes_term(0, False, True, True)
+            ).decode("UTF-8")
 
     class AsciiRecord4(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):
@@ -96,8 +102,9 @@ class FafaComents(KaitaiStruct):
             self.unknown_1 = self._io.read_bytes(8)
             self.object_id = self._io.read_u4le()
             self.unknown_2 = self._io.read_bytes(24)
-            self.record_string = (self._io.read_bytes_term(0, False, True, True)).decode(u"UTF-8")
-
+            self.record_string = (
+                self._io.read_bytes_term(0, False, True, True)
+            ).decode("UTF-8")
 
     class Header(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):
@@ -111,48 +118,47 @@ class FafaComents(KaitaiStruct):
 
         @property
         def seq_number(self):
-            if hasattr(self, '_m_seq_number'):
+            if hasattr(self, "_m_seq_number"):
                 return self._m_seq_number
 
             _pos = self._io.pos()
             self._io.seek(0)
             self._m_seq_number = self._io.read_u2le()
             self._io.seek(_pos)
-            return getattr(self, '_m_seq_number', None)
+            return getattr(self, "_m_seq_number", None)
 
         @property
         def record_type(self):
-            if hasattr(self, '_m_record_type'):
+            if hasattr(self, "_m_record_type"):
                 return self._m_record_type
 
             _pos = self._io.pos()
             self._io.seek(2)
             self._m_record_type = self._io.read_u2le()
             self._io.seek(_pos)
-            return getattr(self, '_m_record_type', None)
+            return getattr(self, "_m_record_type", None)
 
         @property
         def sub_record_length(self):
-            if hasattr(self, '_m_sub_record_length'):
+            if hasattr(self, "_m_sub_record_length"):
                 return self._m_sub_record_length
 
             _pos = self._io.pos()
             self._io.seek(4)
             self._m_sub_record_length = self._io.read_u2le()
             self._io.seek(_pos)
-            return getattr(self, '_m_sub_record_length', None)
+            return getattr(self, "_m_sub_record_length", None)
 
         @property
         def parent(self):
-            if hasattr(self, '_m_parent'):
+            if hasattr(self, "_m_parent"):
                 return self._m_parent
 
             _pos = self._io.pos()
             self._io.seek(6)
             self._m_parent = self._io.read_u4le()
             self._io.seek(_pos)
-            return getattr(self, '_m_parent', None)
-
+            return getattr(self, "_m_parent", None)
 
     class StrzUtf16(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):
@@ -162,14 +168,18 @@ class FafaComents(KaitaiStruct):
             self._read()
 
         def _read(self):
-            self.value = (self._io.read_bytes((2 * (len(self.code_units) - 1)))).decode(u"utf-16le")
+            self.value = (self._io.read_bytes((2 * (len(self.code_units) - 1)))).decode(
+                "utf-16le"
+            )
             self.term = self._io.read_u2le()
             if not self.term == 0:
-                raise kaitaistruct.ValidationNotEqualError(0, self.term, self._io, u"/types/strz_utf_16/seq/1")
+                raise kaitaistruct.ValidationNotEqualError(
+                    0, self.term, self._io, "/types/strz_utf_16/seq/1"
+                )
 
         @property
         def code_units(self):
-            if hasattr(self, '_m_code_units'):
+            if hasattr(self, "_m_code_units"):
                 return self._m_code_units
 
             _pos = self._io.pos()
@@ -183,8 +193,7 @@ class FafaComents(KaitaiStruct):
                     break
                 i += 1
             self._io.seek(_pos)
-            return getattr(self, '_m_code_units', None)
-
+            return getattr(self, "_m_code_units", None)
 
     class Utf16Record(KaitaiStruct):
         def __init__(self, len_unknown_3, _io, _parent=None, _root=None):
@@ -201,29 +210,28 @@ class FafaComents(KaitaiStruct):
             self.len_record = self._io.read_u2le()
             self.tag_reference = FafaComents.StrzUtf16(self._io, self, self._root)
             self.unknown_3 = self._io.read_bytes(self.len_unknown_3)
-            self.record_string = (self._io.read_bytes_term(0, False, True, True)).decode(u"UTF-8")
-
+            self.record_string = (
+                self._io.read_bytes_term(0, False, True, True)
+            ).decode("UTF-8")
 
     @property
     def lookup_id(self):
-        if hasattr(self, '_m_lookup_id'):
+        if hasattr(self, "_m_lookup_id"):
             return self._m_lookup_id
 
         _pos = self._io.pos()
         self._io.seek(27)
         self._m_lookup_id = self._io.read_u2le()
         self._io.seek(_pos)
-        return getattr(self, '_m_lookup_id', None)
+        return getattr(self, "_m_lookup_id", None)
 
     @property
     def sub_record_type(self):
-        if hasattr(self, '_m_sub_record_type'):
+        if hasattr(self, "_m_sub_record_type"):
             return self._m_sub_record_type
 
         _pos = self._io.pos()
         self._io.seek(41)
         self._m_sub_record_type = self._io.read_u2le()
         self._io.seek(_pos)
-        return getattr(self, '_m_sub_record_type', None)
-
-
+        return getattr(self, "_m_sub_record_type", None)

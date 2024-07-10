@@ -20,12 +20,11 @@ class SbRegionRecord:
             return
 
         if r.header.language_type == "Rung NT" or r.header.language_type == "REGION NT":
-            text = r.record_buffer.decode("utf-16-le").rstrip('\x00')
+            text = r.record_buffer.decode("utf-16-le").rstrip("\x00")
             self.text = self.replace_tag_references(text)
 
             query: str = "INSERT INTO rungs VALUES (?, ?, ?)"
-            entry: tuple = (
-                r.header.identifier, self.text, '')
+            entry: tuple = (r.header.identifier, self.text, "")
             self._cur.execute(query, entry)
         elif r.header.language_type == "REGION AST":
             pass
@@ -35,13 +34,14 @@ class SbRegionRecord:
         else:
             pass
 
-
     def replace_tag_references(self, sb_rec):
         m = re.findall("@[A-Za-z0-9]*@", sb_rec)
         for tag in m:
             tag_no = tag[1:-1]
             tag_id = int(tag_no, 16)
-            self._cur.execute("SELECT object_id, comp_name FROM comps WHERE object_id=" + str(tag_id))
+            self._cur.execute(
+                "SELECT object_id, comp_name FROM comps WHERE object_id=" + str(tag_id)
+            )
             results = self._cur.fetchall()
             if len(results) == 0:
                 return sb_rec

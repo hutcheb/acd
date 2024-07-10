@@ -1,4 +1,5 @@
 import os
+from abc import abstractmethod
 from dataclasses import dataclass
 from os import PathLike
 from typing import List
@@ -13,19 +14,20 @@ from acd.unzip import Unzip
 # Returned Project Structures
 
 
-
 # Import Export Interfaces
 class ImportProject:
-    """"Interface to import an PLC project"""
+    """ "Interface to import an PLC project"""
 
+    @abstractmethod
     def import_project(self) -> RSLogix5000Content:
         # Import Project Interface
         pass
 
 
 class ExportProject:
-    """"Interface to export an PLC project"""
+    """ "Interface to export an PLC project"""
 
+    @abstractmethod
     def export_project(self, project: RSLogix5000Content):
         # Export Project Interface
         pass
@@ -35,6 +37,7 @@ class ExportProject:
 @dataclass
 class ImportProjectFromFile(ImportProject):
     """Import a Controller from an ACD stored on file"""
+
     filename: PathLike
 
     def import_project(self) -> RSLogix5000Content:
@@ -46,6 +49,7 @@ class ImportProjectFromFile(ImportProject):
 @dataclass
 class ExportProjectToFile(ExportProject):
     """Export a Controller to an ACD file"""
+
     filename: PathLike
 
     def export_project(self, project: RSLogix5000Content):
@@ -57,6 +61,7 @@ class ExportProjectToFile(ExportProject):
 class Extract:
     """Base class for all extract functions"""
 
+    @abstractmethod
     def extract(self):
         # Interface for extracting database files
         pass
@@ -65,6 +70,7 @@ class Extract:
 class Compress:
     """Base class for all compress functions"""
 
+    @abstractmethod
     def compress(self):
         # Interface for extracting database files
         pass
@@ -74,6 +80,7 @@ class Compress:
 @dataclass
 class ExtractAcdDatabase(Extract):
     """Extract database files from a Logix ACD file"""
+
     filename: PathLike
     output_directory: PathLike
 
@@ -86,6 +93,7 @@ class ExtractAcdDatabase(Extract):
 @dataclass
 class CompressAcdDatabase(Extract):
     """Compress database files to a Logix ACD file"""
+
     filename: PathLike
     output_directory: PathLike
 
@@ -97,6 +105,7 @@ class CompressAcdDatabase(Extract):
 @dataclass
 class ExtractAcdDatabaseRecordsToFiles(ExportProject):
     """Export all ACD databases to a raw database record tree"""
+
     filename: PathLike
     output_directory: PathLike
 
@@ -114,10 +123,14 @@ class DumpCompsRecordsToFile(ExportProject):
     :param str filename: Filename of ACD file
     :param str output_directory: Location to store the records
     """
+
     filename: PathLike
     output_directory: PathLike
 
     def extract(self):
         export = ExportL5x(self.filename)
-        with open(os.path.join(self.output_directory, export.project.target_name + ".log"), "w") as log_file:
+        with open(
+            os.path.join(self.output_directory, export.project.target_name + ".log"),
+            "w",
+        ) as log_file:
             DumpCompsRecords(export._cur, 0).dump(log_file=log_file)

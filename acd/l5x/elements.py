@@ -6,13 +6,14 @@ from enum import Enum
 from os import PathLike
 from pathlib import Path
 from sqlite3 import Cursor
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 from datetime import datetime, timedelta
 import xml.etree.ElementTree as ET
 
 from acd.generated.comps.rx_generic import RxGeneric
 
 from loguru import logger as log
+
 
 @dataclass
 class L5xElementBuilder:
@@ -36,19 +37,29 @@ class L5xElement:
                 if isinstance(attribute_value, L5xElement):
                     child_list.append(attribute_value.to_xml())
                 elif isinstance(attribute_value, list):
-                    if attribute == "tags" or attribute == "data_types" or attribute == "members" or attribute == "programs" or attribute == "routines":
+                    if (
+                        attribute == "tags"
+                        or attribute == "data_types"
+                        or attribute == "members"
+                        or attribute == "programs"
+                        or attribute == "routines"
+                    ):
                         new_child_list: List[str] = []
                         for element in attribute_value:
                             if isinstance(element, L5xElement):
                                 new_child_list.append(element.to_xml())
                             else:
                                 new_child_list.append(f"<{element}/>")
-                        child_list.append(f'<{attribute.title().replace("_", "")}>{"".join(new_child_list)}</{attribute.title().replace("_", "")}>')
+                        child_list.append(
+                            f'<{attribute.title().replace("_", "")}>{"".join(new_child_list)}</{attribute.title().replace("_", "")}>'
+                        )
 
                 else:
                     if attribute == "cls":
                         attribute = "class"
-                    attribute_list.append(f'{attribute.title().replace("_", "")}="{attribute_value}"')
+                    attribute_list.append(
+                        f'{attribute.title().replace("_", "")}="{attribute_value}"'
+                    )
 
         _export_name = self.__class__.__name__.title().replace("_", "")
         return f'<{_export_name} {" ".join(attribute_list)}>{"".join(child_list)}</{_export_name}>'
@@ -132,7 +143,8 @@ class Controller(L5xElement):
 @dataclass
 class RSLogix5000Content(L5xElement):
     """Controller Project"""
-    controller: Controller
+
+    controller: Union[Controller, None]
     schema_revision: str
     software_revision: str
     target_name: str
@@ -188,12 +200,13 @@ def external_access_enum(i: int) -> str:
 
 @dataclass
 class MemberBuilder(L5xElementBuilder):
-    record: List[int] = field(default_factory=[])
+    record: bytes = field(default_factory=bytes)
 
     def build(self) -> Member:
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
-                self._object_id))
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
+            + str(self._object_id)
+        )
         results = self._cur.fetchall()
 
         name = results[0][0]
@@ -206,33 +219,36 @@ class MemberBuilder(L5xElementBuilder):
         extended_records: Dict[int, List[int]] = {}
         for extended_record in r.extended_records:
             extended_records[extended_record.attribute_id] = extended_record.value
-        extended_records[r.last_extended_record.attribute_id] = r.last_extended_record.value
+        extended_records[
+            r.last_extended_record.attribute_id
+        ] = r.last_extended_record.value
 
         cip_data_typoe = struct.unpack_from("<I", self.record, 0x78)[0]
         dimension = struct.unpack_from("<I", self.record, 0x5C)[0]
         radix = radix_enum(struct.unpack_from("<I", self.record, 0x54)[0])
         data_type_id = struct.unpack_from("<I", self.record, 0x58)[0]
         hidden = bool(struct.unpack_from("<I", self.record, 0x70)[0])
-        external_access = external_access_enum(struct.unpack_from("<I", self.record, 0x74)[0])
-
+        external_access = external_access_enum(
+            struct.unpack_from("<I", self.record, 0x74)[0]
+        )
 
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
-                data_type_id))
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
+            + str(data_type_id)
+        )
         data_type_results = self._cur.fetchall()
         data_type = data_type_results[0][0]
-
 
         return Member(name, name, data_type, dimension, radix, hidden, external_access)
 
 
 @dataclass
 class DataTypeBuilder(L5xElementBuilder):
-
     def build(self) -> DataType:
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
-                self._object_id))
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
+            + str(self._object_id)
+        )
         results = self._cur.fetchall()
 
         name = results[0][0]
@@ -242,10 +258,14 @@ class DataTypeBuilder(L5xElementBuilder):
         except Exception as e:
             return DataType(name, name, "NoFamily", "User", [])
 
-        extended_records: Dict[int, List[int]] = {}
+        extended_records: Dict[int, bytes] = {}
         for extended_record in r.extended_records:
-            extended_records[extended_record.attribute_id] = extended_record.value
-        extended_records[r.last_extended_record.attribute_id] = r.last_extended_record.value
+            extended_records[extended_record.attribute_id] = bytes(
+                extended_record.value
+            )
+        extended_records[r.last_extended_record.attribute_id] = bytes(
+            r.last_extended_record.value
+        )
 
         string_family_int = struct.unpack("<I", extended_records[0x6C])[0]
         string_family = "StringFamily" if string_family_int == 1 else "NoFamily"
@@ -264,33 +284,39 @@ class DataTypeBuilder(L5xElementBuilder):
             member_count = 0
 
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
-                self._object_id))
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id="
+            + str(self._object_id)
+        )
         member_results = self._cur.fetchall()
         children: List[Member] = []
         if len(member_results) == 1:
             member_collection_id = member_results[0][1]
 
             self._cur.execute(
-                f"SELECT comp_name, object_id, parent_id, seq_number, record FROM comps WHERE parent_id={member_collection_id} ORDER BY seq_number")
+                f"SELECT comp_name, object_id, parent_id, seq_number, record FROM comps WHERE parent_id={member_collection_id} ORDER BY seq_number"
+            )
             children_results = self._cur.fetchall()
 
             if member_count != len(children_results):
                 raise Exception("Member and children list arent the same length")
 
             for idx, child in enumerate(children_results):
-                children.append(MemberBuilder(self._cur, child[1], extended_records[0x6E + idx]).build())
+                children.append(
+                    MemberBuilder(
+                        self._cur, child[1], bytes(extended_records[0x6E + idx])
+                    ).build()
+                )
 
         return DataType(name, name, string_family, class_type, children)
 
 
 @dataclass
 class MapDeviceBuilder(L5xElementBuilder):
-
     def build(self) -> MapDevice:
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
-                self._object_id))
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
+            + str(self._object_id)
+        )
         results = self._cur.fetchall()
         try:
             r = RxGeneric.from_bytes(results[0][3])
@@ -301,14 +327,19 @@ class MapDeviceBuilder(L5xElementBuilder):
             return MapDevice(results[0][0], 0, 0, 0, 0, 0, 0, [])
 
         self._cur.execute(
-            "SELECT tag_reference, record_string FROM comments WHERE parent=" + str(
-                (r.comment_id * 0x10000) + r.cip_type))
+            "SELECT tag_reference, record_string FROM comments WHERE parent="
+            + str((r.comment_id * 0x10000) + r.cip_type)
+        )
         comment_results = self._cur.fetchall()
 
-        extended_records: Dict[int, List[int]] = {}
+        extended_records: Dict[int, bytes] = {}
         for extended_record in r.extended_records:
-            extended_records[extended_record.attribute_id] = extended_record.value
-        extended_records[r.last_extended_record.attribute_id] = r.last_extended_record.value
+            extended_records[extended_record.attribute_id] = bytes(
+                extended_record.value
+            )
+        extended_records[r.last_extended_record.attribute_id] = bytes(
+            r.last_extended_record.value
+        )
 
         vendor_id = struct.unpack("<H", extended_records[0x01][2:4])[0]
         product_type = struct.unpack("<H", extended_records[0x01][4:6])[0]
@@ -318,46 +349,65 @@ class MapDeviceBuilder(L5xElementBuilder):
         module_id = struct.unpack("<I", extended_records[0x01][0x2C:0x30])[0]
         name = results[0][0]
 
-        return MapDevice(name, module_id, parent_module, slot_no, vendor_id, product_type, product_code, comment_results)
+        return MapDevice(
+            name,
+            module_id,
+            parent_module,
+            slot_no,
+            vendor_id,
+            product_type,
+            product_code,
+            comment_results,
+        )
 
 
 @dataclass
 class TagBuilder(L5xElementBuilder):
-
     def build(self) -> Tag:
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
-                self._object_id))
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
+            + str(self._object_id)
+        )
         results = self._cur.fetchall()
 
         try:
             r = RxGeneric.from_bytes(results[0][3])
         except Exception as e:
-            return Tag(results[0][0], results[0][0], "Base", "", "Decimal", "None", 0, [])
+            return Tag(
+                results[0][0], results[0][0], "Base", "", "Decimal", "None", 0, []
+            )
 
         if r.cip_type != 0x6B and r.cip_type != 0x68:
-            return Tag(results[0][0], results[0][0], "Base", "", "Decimal", "None", 0, [])
+            return Tag(
+                results[0][0], results[0][0], "Base", "", "Decimal", "None", 0, []
+            )
         if r.main_record.data_type == 0xFFFFFFFF:
             data_type = ""
         else:
             self._cur.execute(
-                "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
-                    r.main_record.data_type))
+                "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
+                + str(r.main_record.data_type)
+            )
             data_type_results = self._cur.fetchall()
             data_type = data_type_results[0][0]
 
         self._cur.execute(
-            "SELECT tag_reference, record_string FROM comments WHERE parent=" + str(
-                (r.comment_id * 0x10000) + r.cip_type))
+            "SELECT tag_reference, record_string FROM comments WHERE parent="
+            + str((r.comment_id * 0x10000) + r.cip_type)
+        )
         comment_results = self._cur.fetchall()
 
-        extended_records: Dict[int, List[int]] = {}
+        extended_records: Dict[int, bytes] = {}
         for extended_record in r.extended_records:
-            extended_records[extended_record.attribute_id] = extended_record.value
-        extended_records[r.last_extended_record.attribute_id] = r.last_extended_record.value
+            extended_records[extended_record.attribute_id] = bytes(
+                extended_record.value
+            )
+        extended_records[r.last_extended_record.attribute_id] = bytes(
+            r.last_extended_record.value
+        )
 
         name_length = struct.unpack("<H", extended_records[0x01][0:2])[0]
-        name = bytes(extended_records[0x01][2:name_length+2]).decode('utf-8')
+        name = bytes(extended_records[0x01][2 : name_length + 2]).decode("utf-8")
 
         radix = radix_enum(r.main_record.radix)
         external_access = external_access_enum(r.main_record.external_access)
@@ -368,7 +418,16 @@ class TagBuilder(L5xElementBuilder):
             data_type = data_type + "[" + str(r.main_record.dimension_2) + "]"
         if r.main_record.dimension_3 != 0:
             data_type = data_type + "[" + str(r.main_record.dimension_3) + "]"
-        return Tag(name, name, "Base",  data_type, radix, external_access, r.main_record.data_table_instance, comment_results)
+        return Tag(
+            name,
+            name,
+            "Base",
+            data_type,
+            radix,
+            external_access,
+            r.main_record.data_table_instance,
+            comment_results,
+        )
 
 
 def routine_type_enum(idx: int) -> str:
@@ -391,11 +450,11 @@ def routine_type_enum(idx: int) -> str:
 
 @dataclass
 class RoutineBuilder(L5xElementBuilder):
-
     def build(self) -> Routine:
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
-                self._object_id))
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
+            + str(self._object_id)
+        )
         results = self._cur.fetchall()
 
         try:
@@ -405,17 +464,21 @@ class RoutineBuilder(L5xElementBuilder):
 
         record = results[0][3]
         name = results[0][0]
-        routine_type = routine_type_enum(struct.unpack_from("<H", r.record_buffer, 0x30)[0])
+        routine_type = routine_type_enum(
+            struct.unpack_from("<H", r.record_buffer, 0x30)[0]
+        )
 
         self._cur.execute(
-            "SELECT object_id, parent_id, seq_no FROM region_map WHERE parent_id=" + str(
-                self._object_id) +  " ORDER BY seq_no")
+            "SELECT object_id, parent_id, seq_no FROM region_map WHERE parent_id="
+            + str(self._object_id)
+            + " ORDER BY seq_no"
+        )
         results = self._cur.fetchall()
         rungs = []
         for member in results:
             self._cur.execute(
-                "SELECT object_id, rung FROM rungs WHERE object_id=" + str(
-                    member[0]))
+                "SELECT object_id, rung FROM rungs WHERE object_id=" + str(member[0])
+            )
             rungs_results = self._cur.fetchall()
             if len(rungs_results) > 0:
                 rungs.append(rungs_results[0][1])
@@ -424,49 +487,54 @@ class RoutineBuilder(L5xElementBuilder):
 
 @dataclass
 class AoiBuilder(L5xElementBuilder):
-
     def build(self) -> AOI:
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
-                self._object_id))
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
+            + str(self._object_id)
+        )
         results = self._cur.fetchall()
 
         record = results[0][3]
         name = results[0][0]
 
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
-                self._object_id) + " AND comp_name='RxRoutineCollection'")
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id="
+            + str(self._object_id)
+            + " AND comp_name='RxRoutineCollection'"
+        )
         collection_results = self._cur.fetchall()
+        routines: List[Routine] = []
+        tags: List[Tag] = []
         if len(collection_results) != 0:
             collection_id = collection_results[0][1]
         else:
-            routines = []
-            tags: List[Tag] = []
             return AOI(name, routines, tags)
 
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
-                collection_id))
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id="
+            + str(collection_id)
+        )
         routine_results = self._cur.fetchall()
 
-        routines = []
         for child in routine_results:
             routines.append(RoutineBuilder(self._cur, child[1]).build())
 
         # Get the Program Scoped Tags
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                self._object_id) + " AND comp_name='RxTagCollection'")
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
+            + str(self._object_id)
+            + " AND comp_name='RxTagCollection'"
+        )
         results = self._cur.fetchall()
         if len(results) > 1:
             raise Exception("Contains more than one program tag collection")
 
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                results[0][1]))
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
+            + str(results[0][1])
+        )
         results = self._cur.fetchall()
-        tags: List[Tag] = []
+
         for result in results:
             tags.append(TagBuilder(self._cur, result[1]).build())
 
@@ -475,11 +543,11 @@ class AoiBuilder(L5xElementBuilder):
 
 @dataclass
 class ProgramBuilder(L5xElementBuilder):
-
     def build(self) -> Program:
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
-                self._object_id))
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
+            + str(self._object_id)
+        )
         results = self._cur.fetchall()
 
         r = RxGeneric.from_bytes(results[0][3])
@@ -487,14 +555,17 @@ class ProgramBuilder(L5xElementBuilder):
         name = results[0][0]
 
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
-                self._object_id) + " AND comp_name='RxRoutineCollection'")
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id="
+            + str(self._object_id)
+            + " AND comp_name='RxRoutineCollection'"
+        )
         collection_results = self._cur.fetchall()
         collection_id = collection_results[0][1]
 
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id=" + str(
-                collection_id))
+            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id="
+            + str(collection_id)
+        )
         routine_results = self._cur.fetchall()
 
         routines = []
@@ -503,23 +574,27 @@ class ProgramBuilder(L5xElementBuilder):
 
         # Get the Program Scoped Tags
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                self._object_id) + " AND comp_name='RxTagCollection'")
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
+            + str(self._object_id)
+            + " AND comp_name='RxTagCollection'"
+        )
         results = self._cur.fetchall()
         if len(results) > 1:
             raise Exception("Contains more than one program tag collection")
 
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                results[0][1]))
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
+            + str(results[0][1])
+        )
         results = self._cur.fetchall()
         tags: List[Tag] = []
         for result in results:
             tags.append(TagBuilder(self._cur, result[1]).build())
 
         self._cur.execute(
-            "SELECT tag_reference, record_string FROM comments WHERE parent=" + str(
-                (r.comment_id * 0x10000) + r.cip_type))
+            "SELECT tag_reference, record_string FROM comments WHERE parent="
+            + str((r.comment_id * 0x10000) + r.cip_type)
+        )
         comment_results = self._cur.fetchall()
 
         return Program(name, routines, tags)
@@ -527,38 +602,49 @@ class ProgramBuilder(L5xElementBuilder):
 
 @dataclass
 class ControllerBuilder(L5xElementBuilder):
-
     def build(self) -> Controller:
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type, record FROM comps WHERE parent_id=0 AND record_type=256")
+            "SELECT comp_name, object_id, parent_id, record_type, record FROM comps WHERE parent_id=0 AND record_type=256"
+        )
         results = self._cur.fetchall()
         if len(results) != 1:
             raise Exception("Does not contain exactly one root controller node")
 
         r = RxGeneric.from_bytes(results[0][4])
         self._cur.execute(
-            "SELECT tag_reference, record_string FROM comments WHERE parent=" + str(
-                (r.comment_id * 0x10000) + r.cip_type))
+            "SELECT tag_reference, record_string FROM comments WHERE parent="
+            + str((r.comment_id * 0x10000) + r.cip_type)
+        )
         comment_results = self._cur.fetchall()
 
-        extended_records: Dict[int, List[int]] = {}
+        extended_records: Dict[int, bytes] = {}
         for extended_record in r.extended_records:
-            extended_records[extended_record.attribute_id] = extended_record.value
-        extended_records[r.last_extended_record.attribute_id] = r.last_extended_record.value
+            extended_records[extended_record.attribute_id] = bytes(
+                extended_record.value
+            )
+        extended_records[r.last_extended_record.attribute_id] = bytes(
+            r.last_extended_record.value
+        )
 
-        comm_path = bytes(extended_records[0x6a][:-2]).decode('utf-16')
-        sfc_execution_control = bytes(extended_records[0x6F][:-2]).decode('utf-16')
-        sfc_restart_position = bytes(extended_records[0x70][:-2]).decode('utf-16')
-        sfc_last_scan = bytes(extended_records[0x71][:-2]).decode('utf-16')
+        comm_path = bytes(extended_records[0x6A][:-2]).decode("utf-16")
+        sfc_execution_control = bytes(extended_records[0x6F][:-2]).decode("utf-16")
+        sfc_restart_position = bytes(extended_records[0x70][:-2]).decode("utf-16")
+        sfc_last_scan = bytes(extended_records[0x71][:-2]).decode("utf-16")
 
-        serial_number_raw = hex(struct.unpack("<I", extended_records[0x75])[0])[2:].zfill(8)
-        serial_number = f"16#{serial_number_raw[:4].upper()}_{serial_number_raw[4:].upper()}"
+        serial_number_raw = hex(struct.unpack("<I", extended_records[0x75])[0])[
+            2:
+        ].zfill(8)
+        serial_number = (
+            f"16#{serial_number_raw[:4].upper()}_{serial_number_raw[4:].upper()}"
+        )
 
-        raw_modified_date = struct.unpack("<Q", extended_records[0x66])[0]/10000000
-        epoch_modified_date = datetime(1601, 1, 1) + timedelta(seconds=raw_modified_date)
+        raw_modified_date = struct.unpack("<Q", extended_records[0x66])[0] / 10000000
+        epoch_modified_date = datetime(1601, 1, 1) + timedelta(
+            seconds=raw_modified_date
+        )
         modified_date = epoch_modified_date.strftime("%a %b %d %H:%M:%S %Y")
 
-        raw_created_date = struct.unpack("<Q", extended_records[0x65])[0]/10000000
+        raw_created_date = struct.unpack("<Q", extended_records[0x65])[0] / 10000000
         epoch_created_date = datetime(1601, 1, 1) + timedelta(seconds=raw_created_date)
         created_date = epoch_created_date.strftime("%a %b %d %H:%M:%S %Y")
 
@@ -567,16 +653,19 @@ class ControllerBuilder(L5xElementBuilder):
 
         # Get the data types
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                self._object_id) + " AND comp_name='RxDataTypeCollection'")
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
+            + str(self._object_id)
+            + " AND comp_name='RxDataTypeCollection'"
+        )
         results = self._cur.fetchall()
         if len(results) > 1:
             raise Exception("Contains more than one controller data type collection")
 
         _data_type_id = results[0][1]
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                _data_type_id))
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
+            + str(_data_type_id)
+        )
         results = self._cur.fetchall()
 
         data_types: List[DataType] = []
@@ -586,15 +675,18 @@ class ControllerBuilder(L5xElementBuilder):
 
         # Get the Controller Scoped Tags
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                self._object_id) + " AND comp_name='RxTagCollection'")
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
+            + str(self._object_id)
+            + " AND comp_name='RxTagCollection'"
+        )
         results = self._cur.fetchall()
         if len(results) > 1:
             raise Exception("Contains more than one controller tag collection")
         _tag_collection_object_id = results[0][1]
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                _tag_collection_object_id))
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
+            + str(_tag_collection_object_id)
+        )
         results = self._cur.fetchall()
         tags: List[Tag] = []
         for result in results:
@@ -603,16 +695,19 @@ class ControllerBuilder(L5xElementBuilder):
 
         # Get the Program Collection and get the programs
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                self._object_id) + " AND comp_name='RxProgramCollection'")
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
+            + str(self._object_id)
+            + " AND comp_name='RxProgramCollection'"
+        )
         results = self._cur.fetchall()
         if len(results) > 1:
             raise Exception("Contains more than one controller program collection")
 
         _program_collection_object_id = results[0][1]
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                _program_collection_object_id))
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
+            + str(_program_collection_object_id)
+        )
         results = self._cur.fetchall()
         programs: List[Program] = []
         for result in results:
@@ -621,15 +716,18 @@ class ControllerBuilder(L5xElementBuilder):
 
         # Get the AOI Collection and get the AOIs
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                self._object_id) + " AND comp_name='RxUDIDefinitionCollection'")
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
+            + str(self._object_id)
+            + " AND comp_name='RxUDIDefinitionCollection'"
+        )
         results = self._cur.fetchall()
         if len(results) > 1:
             raise Exception("Contains more than one AOI collection")
         _aoi_collection_object_id = results[0][1]
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                _aoi_collection_object_id))
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
+            + str(_aoi_collection_object_id)
+        )
         results = self._cur.fetchall()
         aois: List[AOI] = []
         for result in results:
@@ -638,22 +736,42 @@ class ControllerBuilder(L5xElementBuilder):
 
         # Get the Map Device (IO) Collection and get the MapDevices
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                self._object_id) + " AND comp_name='RxMapDeviceCollection'")
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
+            + str(self._object_id)
+            + " AND comp_name='RxMapDeviceCollection'"
+        )
         results = self._cur.fetchall()
         if len(results) > 1:
             raise Exception("Contains more than one Map Device collection")
         _map_device_collection_object_id = results[0][1]
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id=" + str(
-                _map_device_collection_object_id))
+            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
+            + str(_map_device_collection_object_id)
+        )
         results = self._cur.fetchall()
         map_devices: List[MapDevice] = []
         for result in results:
             _map_device_object_id = result[1]
-            map_devices.append(MapDeviceBuilder(self._cur, _map_device_object_id).build())
+            map_devices.append(
+                MapDeviceBuilder(self._cur, _map_device_object_id).build()
+            )
 
-        return Controller(controller_name, serial_number, comm_path, sfc_execution_control, sfc_restart_position, sfc_last_scan, created_date, modified_date, data_types, tags, programs, aois, map_devices)
+        return Controller(
+            controller_name,
+            serial_number,
+            comm_path,
+            sfc_execution_control,
+            sfc_restart_position,
+            sfc_last_scan,
+            created_date,
+            modified_date,
+            data_types,
+            tags,
+            programs,
+            aois,
+            map_devices,
+        )
+
 
 @dataclass
 class ProjectBuilder:
@@ -661,17 +779,44 @@ class ProjectBuilder:
 
     def build(self) -> RSLogix5000Content:
         element = ET.parse(self.quick_info_filename)
-        target_name = element.find(".").attrib["Name"]
-        schema_revision = str(element.find("SchemaVersion").attrib["Major"]) + "." + str(
-            element.find("SchemaVersion").attrib["Minor"])
-        software_revision = str(element.find("DeviceIdentity").attrib["MajorRevision"]) + "." + str(
-            element.find("DeviceIdentity").attrib["MinorRevision"])
+        rslogix_content_element = element.find(".")
+        if rslogix_content_element is not None:
+            target_name = rslogix_content_element.attrib["Name"]
+
+        schema_version_element = element.find("SchemaVersion")
+        if schema_version_element is not None:
+            schema_version_major = schema_version_element.attrib["Major"]
+            schema_version_minor = schema_version_element.attrib["Minor"]
+            schema_revision = f"{schema_version_major}.{schema_version_minor}"
+        else:
+            schema_revision = "1.0"
+
+        software_revision_element = element.find("DeviceIdentity")
+        if software_revision_element is not None:
+            software_revision_major = software_revision_element.attrib["MajorRevision"]
+            software_revision_minor = software_revision_element.attrib["MinorRevision"]
+            software_revision = f"{software_revision_major}.{software_revision_minor}"
+        else:
+            software_revision = "33.01"
+
         target_type = "Controller"
         contains_context = "false"
         now = datetime.now()
         export_date = now.strftime("%a %b %d %H:%M:%S %Y")
-        export_options = "NoRawData L5KData DecoratedData ForceProtectedEncoding AllProjDocTrans"
-        return RSLogix5000Content(target_name, None, schema_revision, software_revision, target_name, target_type, contains_context, export_date, export_options)
+        export_options = (
+            "NoRawData L5KData DecoratedData ForceProtectedEncoding AllProjDocTrans"
+        )
+        return RSLogix5000Content(
+            target_name,
+            None,
+            schema_revision,
+            software_revision,
+            target_name,
+            target_type,
+            contains_context,
+            export_date,
+            export_options,
+        )
 
 
 @dataclass
@@ -680,7 +825,8 @@ class DumpCompsRecords(L5xElementBuilder):
 
     def dump(self, parent_id: int = 0, log_file=None):
         self._cur.execute(
-            f"SELECT comp_name, object_id, parent_id, record_type, record FROM comps WHERE parent_id={parent_id}")
+            f"SELECT comp_name, object_id, parent_id, record_type, record FROM comps WHERE parent_id={parent_id}"
+        )
         results = self._cur.fetchall()
 
         for result in results:
@@ -694,7 +840,8 @@ class DumpCompsRecords(L5xElementBuilder):
                 os.makedirs(new_path)
             with open(Path(os.path.join(new_path, name + ".dat")), "wb") as file:
                 log_file.write(
-                    f"Class - {struct.unpack_from('<H', result[4], 0xA)[0]} Instance {struct.unpack_from('<H', result[4], 0xC)[0]}- {str(new_path) + '/' + name}\n")
+                    f"Class - {struct.unpack_from('<H', result[4], 0xA)[0]} Instance {struct.unpack_from('<H', result[4], 0xC)[0]}- {str(new_path) + '/' + name}\n"
+                )
                 file.write(record)
 
             DumpCompsRecords(self._cur, object_id, new_path).dump(object_id, log_file)

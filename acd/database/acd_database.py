@@ -24,14 +24,26 @@ class AcdDatabase:
         log.info("Getting records from ACD Comps file and storing in sqllite database")
         self.comps_db = DbExtract(os.path.join(self._temp_dir, "Comps.Dat")).read()
 
-        log.info("Getting records from ACD SbRegion file and storing in sqllite database")
-        self.sb_region_db = DbExtract(os.path.join(self._temp_dir, "SbRegion.Dat")).read()
+        log.info(
+            "Getting records from ACD SbRegion file and storing in sqllite database"
+        )
+        self.sb_region_db = DbExtract(
+            os.path.join(self._temp_dir, "SbRegion.Dat")
+        ).read()
 
-        log.info("Getting records from ACD Comments file and storing in sqllite database")
-        self.comments_db = DbExtract(os.path.join(self._temp_dir, "Comments.Dat")).read()
+        log.info(
+            "Getting records from ACD Comments file and storing in sqllite database"
+        )
+        self.comments_db = DbExtract(
+            os.path.join(self._temp_dir, "Comments.Dat")
+        ).read()
 
-        log.info("Getting records from ACD Nameless file and storing in sqllite database")
-        self.nameless_db = DbExtract(os.path.join(self._temp_dir, "Nameless.Dat")).read()
+        log.info(
+            "Getting records from ACD Nameless file and storing in sqllite database"
+        )
+        self.nameless_db = DbExtract(
+            os.path.join(self._temp_dir, "Nameless.Dat")
+        ).read()
 
     def extract_to_file(self):
         directory = os.path.join(self._temp_dir, "comps_db")

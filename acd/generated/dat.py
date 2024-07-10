@@ -4,8 +4,12 @@ import kaitaistruct
 from kaitaistruct import KaitaiStruct, KaitaiStream, BytesIO
 
 
-if getattr(kaitaistruct, 'API_VERSION', (0, 9)) < (0, 9):
-    raise Exception("Incompatible Kaitai Struct Python API: 0.9 or later is required, but you have %s" % (kaitaistruct.__version__))
+if getattr(kaitaistruct, "API_VERSION", (0, 9)) < (0, 9):
+    raise Exception(
+        "Incompatible Kaitai Struct Python API: 0.9 or later is required, but you have %s"
+        % (kaitaistruct.__version__)
+    )
+
 
 class Dat(KaitaiStruct):
     def __init__(self, _io, _parent=None, _root=None):
@@ -16,7 +20,9 @@ class Dat(KaitaiStruct):
 
     def _read(self):
         self.header = Dat.Header(self._io, self, self._root)
-        self._raw_records = self._io.read_bytes(((self.header.file_length - self.header.first_record_position) + 1))
+        self._raw_records = self._io.read_bytes(
+            ((self.header.file_length - self.header.first_record_position) + 1)
+        )
         _io__raw_records = KaitaiStream(BytesIO(self._raw_records))
         self.records = Dat.Records(_io__raw_records, self, self._root)
 
@@ -34,7 +40,6 @@ class Dat(KaitaiStruct):
             self.unknown_2 = self._io.read_u4le()
             self.record_buffer = self._io.read_bytes(self.len_record_buffer)
 
-
     class FdfdRecord(KaitaiStruct):
         def __init__(self, len_record_buffer, _io, _parent=None, _root=None):
             self._io = _io
@@ -46,7 +51,6 @@ class Dat(KaitaiStruct):
         def _read(self):
             self.record_buffer = self._io.read_bytes_full()
 
-
     class BffbRecord(KaitaiStruct):
         def __init__(self, len_record_buffer, _io, _parent=None, _root=None):
             self._io = _io
@@ -57,7 +61,6 @@ class Dat(KaitaiStruct):
 
         def _read(self):
             self.record_buffer = self._io.read_bytes(self.len_record_buffer)
-
 
     class Header(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):
@@ -77,8 +80,6 @@ class Dat(KaitaiStruct):
             for i in range((self.first_record_position - 24)):
                 self.header_buffer.append(self._io.read_u1())
 
-
-
     class Records(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):
             self._io = _io
@@ -93,8 +94,6 @@ class Dat(KaitaiStruct):
                 self.record.append(Dat.Record(self._io, self, self._root))
                 i += 1
 
-
-
     class Record(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):
             self._io = _io
@@ -104,8 +103,15 @@ class Dat(KaitaiStruct):
 
         def _read(self):
             self.identifier = self._io.read_u2le()
-            if not  ((self.identifier == 65278) or (self.identifier == 65021) or (self.identifier == 64250) or (self.identifier == 64447)) :
-                raise kaitaistruct.ValidationNotAnyOfError(self.identifier, self._io, u"/types/record/seq/0")
+            if not (
+                (self.identifier == 65278)
+                or (self.identifier == 65021)
+                or (self.identifier == 64250)
+                or (self.identifier == 64447)
+            ):
+                raise kaitaistruct.ValidationNotAnyOfError(
+                    self.identifier, self._io, "/types/record/seq/0"
+                )
             self.len_record = self._io.read_u4le()
             _on = self.identifier
             if _on == 65278:
@@ -115,18 +121,23 @@ class Dat(KaitaiStruct):
             elif _on == 64447:
                 self._raw_record = self._io.read_bytes((self.len_record - 6))
                 _io__raw_record = KaitaiStream(BytesIO(self._raw_record))
-                self.record = Dat.BffbRecord((self.len_record - 6), _io__raw_record, self, self._root)
+                self.record = Dat.BffbRecord(
+                    (self.len_record - 6), _io__raw_record, self, self._root
+                )
             elif _on == 64250:
                 self._raw_record = self._io.read_bytes((self.len_record - 6))
                 _io__raw_record = KaitaiStream(BytesIO(self._raw_record))
-                self.record = Dat.FafaRecord((self.len_record - 6), _io__raw_record, self, self._root)
+                self.record = Dat.FafaRecord(
+                    (self.len_record - 6), _io__raw_record, self, self._root
+                )
             elif _on == 65021:
                 self._raw_record = self._io.read_bytes((self.len_record - 6))
                 _io__raw_record = KaitaiStream(BytesIO(self._raw_record))
-                self.record = Dat.FdfdRecord((self.len_record - 6), _io__raw_record, self, self._root)
+                self.record = Dat.FdfdRecord(
+                    (self.len_record - 6), _io__raw_record, self, self._root
+                )
             else:
                 self.record = self._io.read_bytes((self.len_record - 6))
-
 
     class FafaRecord(KaitaiStruct):
         def __init__(self, len_record_buffer, _io, _parent=None, _root=None):
@@ -139,49 +150,46 @@ class Dat(KaitaiStruct):
         def _read(self):
             self.record_buffer = self._io.read_bytes(self.len_record_buffer)
 
-
     @property
     def third_array_dimension(self):
-        if hasattr(self, '_m_third_array_dimension'):
+        if hasattr(self, "_m_third_array_dimension"):
             return self._m_third_array_dimension
 
         _pos = self._io.pos()
         self._io.seek(182)
         self._m_third_array_dimension = self._io.read_u4le()
         self._io.seek(_pos)
-        return getattr(self, '_m_third_array_dimension', None)
+        return getattr(self, "_m_third_array_dimension", None)
 
     @property
     def data_type_id(self):
-        if hasattr(self, '_m_data_type_id'):
+        if hasattr(self, "_m_data_type_id"):
             return self._m_data_type_id
 
         _pos = self._io.pos()
         self._io.seek(190)
         self._m_data_type_id = self._io.read_u4le()
         self._io.seek(_pos)
-        return getattr(self, '_m_data_type_id', None)
+        return getattr(self, "_m_data_type_id", None)
 
     @property
     def tag_name_length(self):
-        if hasattr(self, '_m_tag_name_length'):
+        if hasattr(self, "_m_tag_name_length"):
             return self._m_tag_name_length
 
         _pos = self._io.pos()
         self._io.seek(238)
         self._m_tag_name_length = self._io.read_u2le()
         self._io.seek(_pos)
-        return getattr(self, '_m_tag_name_length', None)
+        return getattr(self, "_m_tag_name_length", None)
 
     @property
     def tag_name(self):
-        if hasattr(self, '_m_tag_name'):
+        if hasattr(self, "_m_tag_name"):
             return self._m_tag_name
 
         _pos = self._io.pos()
         self._io.seek(240)
-        self._m_tag_name = (self._io.read_bytes(self.tag_name_length)).decode(u"UTF-8")
+        self._m_tag_name = (self._io.read_bytes(self.tag_name_length)).decode("UTF-8")
         self._io.seek(_pos)
-        return getattr(self, '_m_tag_name', None)
-
-
+        return getattr(self, "_m_tag_name", None)
