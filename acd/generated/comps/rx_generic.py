@@ -21,7 +21,11 @@ class RxGeneric(KaitaiStruct):
         self.cip_type = self._io.read_u2le()
         self.comment_id = self._io.read_u2le()
         _on = self.cip_type
-        if _on == 107:
+        if _on == 104:
+            self._raw_main_record = self._io.read_bytes(60)
+            _io__raw_main_record = KaitaiStream(BytesIO(self._raw_main_record))
+            self.main_record = RxGeneric.RxTag(_io__raw_main_record, self, self._root)
+        elif _on == 107:
             self._raw_main_record = self._io.read_bytes(60)
             _io__raw_main_record = KaitaiStream(BytesIO(self._raw_main_record))
             self.main_record = RxGeneric.RxTag(_io__raw_main_record, self, self._root)
@@ -257,5 +261,16 @@ class RxGeneric(KaitaiStruct):
             self.len_value = self._io.read_u4le()
             self.value = self._io.read_bytes(self.len_value)
 
+
+    @property
+    def record_buffer(self):
+        if hasattr(self, '_m_record_buffer'):
+            return self._m_record_buffer
+
+        _pos = self._io.pos()
+        self._io.seek(14)
+        self._m_record_buffer = self._io.read_bytes(60)
+        self._io.seek(_pos)
+        return getattr(self, '_m_record_buffer', None)
 
 

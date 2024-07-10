@@ -19,7 +19,7 @@ class SbRegionRecord:
         else:
             return
 
-        if r.header.language_type == "Rung NT":
+        if r.header.language_type == "Rung NT" or r.header.language_type == "REGION NT":
             text = r.record_buffer.decode("utf-16-le").rstrip('\x00')
             self.text = self.replace_tag_references(text)
 
@@ -28,6 +28,9 @@ class SbRegionRecord:
                 r.header.identifier, self.text, '')
             self._cur.execute(query, entry)
         elif r.header.language_type == "REGION AST":
+            pass
+        elif r.header.language_type == "REGION LE UID":
+            uuid = struct.unpack("<I", r.record_buffer[-4:])[0]
             pass
         else:
             pass
@@ -40,5 +43,7 @@ class SbRegionRecord:
             tag_id = int(tag_no, 16)
             self._cur.execute("SELECT object_id, comp_name FROM comps WHERE object_id=" + str(tag_id))
             results = self._cur.fetchall()
+            if len(results) == 0:
+                return sb_rec
             sb_rec = sb_rec.replace(tag, results[0][1])
         return sb_rec

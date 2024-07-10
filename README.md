@@ -61,6 +61,7 @@ ExtractAcdDatabaseRecordsToFiles('CuteLogix.ACD', 'output_directory').extract()
 ### Dump Comps Database Records
 
 The Comps database contains a lot of information and can be export as a directory structure to make it easier to look at.
+It will also extract the CIP class and instance and write it to the log file.
 
 ```python
 from acd.api import DumpCompsRecordsToFile

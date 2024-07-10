@@ -10,12 +10,9 @@ from typing import List, Tuple, Dict
 from datetime import datetime, timedelta
 import xml.etree.ElementTree as ET
 
-from acd.exceptions.CompsRecordException import UnknownRxTagVersion
 from acd.generated.comps.rx_generic import RxGeneric
-from acd.generated.comps.rx_tag import RxTag
-from acd.generated.controller.rx_controller import RxController
-from acd.generated.map_device.rx_map_device import RxMapDevice
 
+from loguru import logger as log
 
 @dataclass
 class L5xElementBuilder:
@@ -39,7 +36,7 @@ class L5xElement:
                 if isinstance(attribute_value, L5xElement):
                     child_list.append(attribute_value.to_xml())
                 elif isinstance(attribute_value, list):
-                    if attribute == "tags" or attribute == "data_types" or attribute == "members":
+                    if attribute == "tags" or attribute == "data_types" or attribute == "members" or attribute == "programs" or attribute == "routines":
                         new_child_list: List[str] = []
                         for element in attribute_value:
                             if isinstance(element, L5xElement):
@@ -99,6 +96,8 @@ class MapDevice(L5xElement):
 
 @dataclass
 class Routine(L5xElement):
+    name: str
+    type: str
     rungs: List[str]
 
 
@@ -137,7 +136,7 @@ class RSLogix5000Content(L5xElement):
     schema_revision: str
     software_revision: str
     target_name: str
-    target_name: str
+    target_type: str
     contains_context: str
     export_date: str
     export_options: str
@@ -336,16 +335,16 @@ class TagBuilder(L5xElementBuilder):
         except Exception as e:
             return Tag(results[0][0], results[0][0], "Base", "", "Decimal", "None", 0, [])
 
-        if r.cip_type != 0x6B:
+        if r.cip_type != 0x6B and r.cip_type != 0x68:
             return Tag(results[0][0], results[0][0], "Base", "", "Decimal", "None", 0, [])
         if r.main_record.data_type == 0xFFFFFFFF:
-            return Tag(results[0][0], results[0][0], "Base", "", "Decimal", "None", r.main_record.data_table_instance, [])
-
-        self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
-                r.main_record.data_type))
-        data_type_results = self._cur.fetchall()
-        data_type = data_type_results[0][0]
+            data_type = ""
+        else:
+            self._cur.execute(
+                "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id=" + str(
+                    r.main_record.data_type))
+            data_type_results = self._cur.fetchall()
+            data_type = data_type_results[0][0]
 
         self._cur.execute(
             "SELECT tag_reference, record_string FROM comments WHERE parent=" + str(
@@ -372,6 +371,24 @@ class TagBuilder(L5xElementBuilder):
         return Tag(name, name, "Base",  data_type, radix, external_access, r.main_record.data_table_instance, comment_results)
 
 
+def routine_type_enum(idx: int) -> str:
+    if idx == 0:
+        return "TypeLess"
+    if idx == 1:
+        return "RLL"
+    if idx == 2:
+        return "FBD"
+    if idx == 3:
+        return "SFC"
+    if idx == 4:
+        return "ST"
+    if idx == 5:
+        return "External"
+    if idx == 6:
+        return "Encrypted"
+    return "Typeless"
+
+
 @dataclass
 class RoutineBuilder(L5xElementBuilder):
 
@@ -381,8 +398,14 @@ class RoutineBuilder(L5xElementBuilder):
                 self._object_id))
         results = self._cur.fetchall()
 
+        try:
+            r = RxGeneric.from_bytes(results[0][3])
+        except Exception as e:
+            return Routine(results[0][0], results[0][0], "", [])
+
         record = results[0][3]
         name = results[0][0]
+        routine_type = routine_type_enum(struct.unpack_from("<H", r.record_buffer, 0x30)[0])
 
         self._cur.execute(
             "SELECT object_id, parent_id, seq_no FROM region_map WHERE parent_id=" + str(
@@ -396,7 +419,7 @@ class RoutineBuilder(L5xElementBuilder):
             rungs_results = self._cur.fetchall()
             if len(rungs_results) > 0:
                 rungs.append(rungs_results[0][1])
-        return Routine(name, rungs)
+        return Routine(name, name, routine_type, rungs)
 
 
 @dataclass
@@ -459,6 +482,8 @@ class ProgramBuilder(L5xElementBuilder):
                 self._object_id))
         results = self._cur.fetchall()
 
+        r = RxGeneric.from_bytes(results[0][3])
+
         name = results[0][0]
 
         self._cur.execute(
@@ -491,6 +516,11 @@ class ProgramBuilder(L5xElementBuilder):
         tags: List[Tag] = []
         for result in results:
             tags.append(TagBuilder(self._cur, result[1]).build())
+
+        self._cur.execute(
+            "SELECT tag_reference, record_string FROM comments WHERE parent=" + str(
+                (r.comment_id * 0x10000) + r.cip_type))
+        comment_results = self._cur.fetchall()
 
         return Program(name, routines, tags)
 
@@ -641,14 +671,14 @@ class ProjectBuilder:
         now = datetime.now()
         export_date = now.strftime("%a %b %d %H:%M:%S %Y")
         export_options = "NoRawData L5KData DecoratedData ForceProtectedEncoding AllProjDocTrans"
-        return RSLogix5000Content(None, schema_revision, software_revision, target_name, target_type, contains_context, export_date, export_options)
+        return RSLogix5000Content(target_name, None, schema_revision, software_revision, target_name, target_type, contains_context, export_date, export_options)
 
 
 @dataclass
 class DumpCompsRecords(L5xElementBuilder):
     base_directory: PathLike = Path("dump")
 
-    def dump(self, parent_id: int = 0):
+    def dump(self, parent_id: int = 0, log_file=None):
         self._cur.execute(
             f"SELECT comp_name, object_id, parent_id, record_type, record FROM comps WHERE parent_id={parent_id}")
         results = self._cur.fetchall()
@@ -663,8 +693,8 @@ class DumpCompsRecords(L5xElementBuilder):
             if not os.path.exists(os.path.join(new_path)):
                 os.makedirs(new_path)
             with open(Path(os.path.join(new_path, name + ".dat")), "wb") as file:
+                log_file.write(
+                    f"Class - {struct.unpack_from('<H', result[4], 0xA)[0]} Instance {struct.unpack_from('<H', result[4], 0xC)[0]}- {str(new_path) + '/' + name}\n")
                 file.write(record)
 
-            DumpCompsRecords(self._cur, object_id, new_path).dump(object_id)
-
-
+            DumpCompsRecords(self._cur, object_id, new_path).dump(object_id, log_file)

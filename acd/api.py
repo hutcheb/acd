@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from os import PathLike
 from typing import List
@@ -118,4 +119,5 @@ class DumpCompsRecordsToFile(ExportProject):
 
     def extract(self):
         export = ExportL5x(self.filename)
-        DumpCompsRecords(export._cur, 0).dump(0)
+        with open(os.path.join(self.output_directory, export.project.target_name + ".log"), "w") as log_file:
+            DumpCompsRecords(export._cur, 0).dump(log_file=log_file)

@@ -2,6 +2,11 @@ meta:
   id: rx_generic
   endian: le
 
+instances:
+  record_buffer:
+    pos: 0x0E
+    size: 0x3C
+
 seq:
   - id: parent_id
     type: u4

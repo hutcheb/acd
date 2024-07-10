@@ -1,12 +1,11 @@
 import os
 from pathlib import Path
 
-from acd.api import ImportProjectFromFile, RSLogix5000Content, Extract, ExtractAcdDatabase
+from acd.api import ImportProjectFromFile, RSLogix5000Content, Extract, ExtractAcdDatabase, DumpCompsRecordsToFile
 from acd.export_l5x import ExportL5x
 
 
 from acd.l5x.elements import DumpCompsRecords
-import xml.etree.ElementTree as ET
 from xml.dom import minidom
 
 
@@ -23,8 +22,7 @@ def test_extract_database_files():
 
 
 def test_dump_to_files():
-    export = ExportL5x(Path(os.path.join("..", "resources", "CuteLogix.ACD")))
-    DumpCompsRecords(export._cur, 0).dump(0)
+    DumpCompsRecordsToFile(os.path.join("..", "resources", "CuteLogix.ACD"), 'build').extract()
 
 
 def test_to_xml():

@@ -12,17 +12,15 @@ class NamelessRecord:
     dat_record: DatRecord
 
     def __post_init__(self):
-        if self.dat_record.identifier == b'\xfa\xfa':
+        if self.dat_record.identifier == 64250:
             identifier_offset = 8
             self.identifier = struct.unpack(
-                "I", self.dat_record.record[identifier_offset : identifier_offset + 4]
+                "I", self.dat_record.record.record_buffer[identifier_offset : identifier_offset + 4]
             )[0]
 
-            not_sure_offset = 12
-            self.not_sure = struct.unpack(
-                "I", self.dat_record.record[not_sure_offset: not_sure_offset + 4]
-            )[0]
+            object_identifier_offset = 0x0C
+            self.object_identifier = struct.unpack_from("<I", self.dat_record.record.record_buffer, object_identifier_offset)[0]
 
             query: str = "INSERT INTO nameless VALUES (?, ?, ?)"
-            enty: tuple = (self.identifier, self.not_sure, self.dat_record.record)
+            enty: tuple = (self.object_identifier, self.identifier, self.dat_record.record.record_buffer)
             self._cur.execute(query, enty)
