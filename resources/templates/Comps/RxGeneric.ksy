@@ -23,6 +23,7 @@ seq:
     type:
       switch-on: cip_type
       cases:
+        0x68: rx_tag
         0x6B: rx_tag
         _: unknown
   - id: len_record
