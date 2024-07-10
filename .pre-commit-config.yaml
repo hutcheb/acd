@@ -47,4 +47,4 @@ repos:
         types: [python]
         pass_filenames: false
         follow-imports: skip
-        args: [acd/database, acd/exceptions, acd/l5x, --check-untyped-defs, --ignore-missing-imports, --exclude, acd/generated/, --follow-imports, skip]
+        args: [acd/database, acd/exceptions, acd/l5x, acd/record, acd/zip, --check-untyped-defs, --ignore-missing-imports, --exclude, acd/generated/, --follow-imports, skip]
