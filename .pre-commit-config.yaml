@@ -45,4 +45,4 @@ repos:
     hooks:
     -   id: mypy
         types: [python]
-        exclude: build
+        args: [--check-untyped-defs, --ignore-missing-imports]
