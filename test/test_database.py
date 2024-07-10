@@ -1,12 +1,8 @@
-from typing import List
-
 import pytest
 
-from acd.comps import CompsRecord
-from acd.dbextract import DbExtract
-from acd.export_l5x import ExportL5x
-from acd.sbregion import SbRegionRecord
-from acd.unzip import Unzip
+from acd.database.dbextract import DbExtract
+from acd.l5x.export_l5x import ExportL5x
+from acd.zip.unzip import Unzip
 
 from loguru import logger as log
 

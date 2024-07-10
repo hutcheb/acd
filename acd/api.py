@@ -2,13 +2,12 @@ import os
 from abc import abstractmethod
 from dataclasses import dataclass
 from os import PathLike
-from typing import List
+
+from acd.l5x.export_l5x import ExportL5x
+from acd.zip.unzip import Unzip
 
 from acd.database.acd_database import AcdDatabase
-from acd.l5x.elements import Controller, DumpCompsRecords, RSLogix5000Content
-
-from acd.export_l5x import ExportL5x
-from acd.unzip import Unzip
+from acd.l5x.elements import DumpCompsRecords, RSLogix5000Content
 
 
 # Returned Project Structures

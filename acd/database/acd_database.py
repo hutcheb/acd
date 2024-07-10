@@ -1,10 +1,10 @@
 import os
 from dataclasses import dataclass
+
 from loguru import logger as log
 
-
-from acd.dbextract import DbExtract
-from acd.unzip import Unzip
+from acd.database.dbextract import DbExtract
+from acd.zip.unzip import Unzip
 
 
 @dataclass

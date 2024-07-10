@@ -45,4 +45,6 @@ repos:
     hooks:
     -   id: mypy
         types: [python]
-        args: [--check-untyped-defs, --ignore-missing-imports]
+        pass_filenames: false
+        follow-imports: skip
+        args: [acd/database, acd/exceptions, acd/l5x, --check-untyped-defs, --ignore-missing-imports, --exclude, acd/generated/, --follow-imports, skip]

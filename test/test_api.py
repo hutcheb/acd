@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from xml.dom import minidom
 
 from acd.api import (
     ImportProjectFromFile,
@@ -8,11 +9,6 @@ from acd.api import (
     ExtractAcdDatabase,
     DumpCompsRecordsToFile,
 )
-from acd.export_l5x import ExportL5x
-
-
-from acd.l5x.elements import DumpCompsRecords
-from xml.dom import minidom
 
 
 def test_import_from_file():

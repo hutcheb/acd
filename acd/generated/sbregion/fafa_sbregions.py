@@ -1,8 +1,7 @@
 # This is a generated file! Please edit source .ksy file and use kaitai-struct-compiler to rebuild
 
 import kaitaistruct
-from kaitaistruct import KaitaiStruct, KaitaiStream, BytesIO
-
+from kaitaistruct import KaitaiStruct, KaitaiStream
 
 if getattr(kaitaistruct, "API_VERSION", (0, 9)) < (0, 9):
     raise Exception(

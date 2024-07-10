@@ -2,7 +2,7 @@ import os
 import sqlite3
 import tempfile
 from dataclasses import dataclass
-from sqlite3 import Cursor, Connection
+from sqlite3 import Cursor
 
 from loguru import logger as log
 

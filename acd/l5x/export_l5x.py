@@ -2,27 +2,25 @@ import argparse
 import os
 import sqlite3
 import struct
-import tempfile
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
+from pathlib import Path
 from sqlite3 import Cursor
-import xml.etree.ElementTree as ET
 from typing import Union
 
-from acd.comments import CommentsRecord
-from acd.comps import CompsRecord
-from acd.dbextract import DbExtract
+from acd.database.dbextract import DbExtract
+from acd.zip.unzip import Unzip
+from loguru import logger as log
+
 from acd.l5x.elements import (
     Controller,
     ControllerBuilder,
     ProjectBuilder,
     RSLogix5000Content,
 )
-from acd.nameless import NamelessRecord
-from acd.sbregion import SbRegionRecord
-from acd.unzip import Unzip
-
-from loguru import logger as log
+from acd.record.comments import CommentsRecord
+from acd.record.comps import CompsRecord
+from acd.record.nameless import NamelessRecord
+from acd.record.sbregion import SbRegionRecord
 
 
 @dataclass
@@ -134,7 +132,7 @@ class ExportL5x:
     def project(self):
         if self._project is None:
             self._project = ProjectBuilder(
-                os.path.join(self._temp_dir, "QuickInfo.XML")
+                Path(os.path.join(self._temp_dir, "QuickInfo.XML"))
             ).build()
             self._project.controller = self.controller
         return self._project

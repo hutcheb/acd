@@ -1,11 +1,10 @@
-import struct
 from dataclasses import dataclass
 from io import BytesIO
 from sqlite3 import Cursor
 
+from acd.database.dbextract import DatRecord
 from kaitaistruct import KaitaiStream
 
-from acd.dbextract import DatRecord
 from acd.generated.comps.fafa_comps import FafaComps
 from acd.generated.comps.fdfd_comps import FdfdComps
 

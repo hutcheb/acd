@@ -3,7 +3,8 @@ import struct
 from dataclasses import dataclass
 from sqlite3 import Cursor
 
-from acd.dbextract import DatRecord
+from acd.database.dbextract import DatRecord
+
 from acd.generated.sbregion.fafa_sbregions import FafaSbregions
 
 

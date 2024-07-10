@@ -1,6 +1,6 @@
 import pytest
 
-from acd.unzip import Unzip
+from acd.zip.unzip import Unzip
 
 
 @pytest.fixture()

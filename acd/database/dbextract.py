@@ -1,7 +1,6 @@
 import struct
-from dataclasses import dataclass, InitVar
+from dataclasses import dataclass
 from io import BufferedReader
-from pathlib import Path
 
 from acd.generated.dat import Dat
 
@@ -54,7 +53,6 @@ class DatRecord:
 
     def __post_init__(self):
         self.identifier: bytes = self.f.read(2)
-        self.record: bytes = bytearray()
 
         self.record_length = struct.unpack("I", self.f.read(4))[0]
         self.record: bytes = self.f.read(self.record_length - 6)

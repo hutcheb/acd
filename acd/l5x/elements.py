@@ -1,18 +1,15 @@
 import os
 import shutil
 import struct
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from enum import Enum
+from datetime import datetime, timedelta
 from os import PathLike
 from pathlib import Path
 from sqlite3 import Cursor
 from typing import List, Tuple, Dict, Union
-from datetime import datetime, timedelta
-import xml.etree.ElementTree as ET
 
 from acd.generated.comps.rx_generic import RxGeneric
-
-from loguru import logger as log
 
 
 @dataclass
