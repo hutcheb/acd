@@ -45,10 +45,6 @@ class RxGeneric(KaitaiStruct):
                 RxGeneric.AttributeRecord(self._io, self, self._root)
             )
 
-        self.last_extended_record = RxGeneric.LastAttributeRecord(
-            self._io, self, self._root
-        )
-
     class Unknown(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):
             self._io = _io

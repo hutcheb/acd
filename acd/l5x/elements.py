@@ -188,9 +188,9 @@ def external_access_enum(i: int) -> str:
     default = "Read/Write"
     if i == 0:
         return default
-    if i == 1:
-        return "Read Only"
     if i == 2:
+        return "Read Only"
+    if i == 3:
         return "None"
     return default
 
@@ -216,9 +216,6 @@ class MemberBuilder(L5xElementBuilder):
         extended_records: Dict[int, List[int]] = {}
         for extended_record in r.extended_records:
             extended_records[extended_record.attribute_id] = extended_record.value
-        extended_records[
-            r.last_extended_record.attribute_id
-        ] = r.last_extended_record.value
 
         cip_data_typoe = struct.unpack_from("<I", self.record, 0x78)[0]
         dimension = struct.unpack_from("<I", self.record, 0x5C)[0]
@@ -260,9 +257,6 @@ class DataTypeBuilder(L5xElementBuilder):
             extended_records[extended_record.attribute_id] = bytes(
                 extended_record.value
             )
-        extended_records[r.last_extended_record.attribute_id] = bytes(
-            r.last_extended_record.value
-        )
 
         string_family_int = struct.unpack("<I", extended_records[0x6C])[0]
         string_family = "StringFamily" if string_family_int == 1 else "NoFamily"
@@ -275,7 +269,7 @@ class DataTypeBuilder(L5xElementBuilder):
             class_type = "IO"
         if built_in > 0:
             class_type = "ProductDefined"
-        if len(extended_records[0x64]) == 0x04:
+        if 0x64 in extended_records and len(extended_records[0x64]) == 0x04:
             member_count = struct.unpack("<I", extended_records[0x64])[0]
         else:
             member_count = 0
@@ -334,9 +328,6 @@ class MapDeviceBuilder(L5xElementBuilder):
             extended_records[extended_record.attribute_id] = bytes(
                 extended_record.value
             )
-        extended_records[r.last_extended_record.attribute_id] = bytes(
-            r.last_extended_record.value
-        )
 
         vendor_id = struct.unpack("<H", extended_records[0x01][2:4])[0]
         product_type = struct.unpack("<H", extended_records[0x01][4:6])[0]
@@ -399,15 +390,13 @@ class TagBuilder(L5xElementBuilder):
             extended_records[extended_record.attribute_id] = bytes(
                 extended_record.value
             )
-        extended_records[r.last_extended_record.attribute_id] = bytes(
-            r.last_extended_record.value
-        )
 
         name_length = struct.unpack("<H", extended_records[0x01][0:2])[0]
         name = bytes(extended_records[0x01][2 : name_length + 2]).decode("utf-8")
 
         radix = radix_enum(r.main_record.radix)
-        external_access = external_access_enum(r.main_record.external_access)
+        name_length_raw = struct.unpack_from("<H", extended_records[0x01], 0x21E)[0]
+        external_access = external_access_enum(name_length_raw)
 
         if r.main_record.dimension_1 != 0:
             data_type = data_type + "[" + str(r.main_record.dimension_1) + "]"
@@ -619,9 +608,6 @@ class ControllerBuilder(L5xElementBuilder):
             extended_records[extended_record.attribute_id] = bytes(
                 extended_record.value
             )
-        extended_records[r.last_extended_record.attribute_id] = bytes(
-            r.last_extended_record.value
-        )
 
         comm_path = bytes(extended_records[0x6A][:-2]).decode("utf-16")
         sfc_execution_control = bytes(extended_records[0x6F][:-2]).decode("utf-16")

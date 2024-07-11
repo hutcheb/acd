@@ -34,8 +34,6 @@ seq:
     type: attribute_record
     repeat: expr
     repeat-expr: count_record - 1
-  - id: last_extended_record
-    type: last_attribute_record
 
 types:
   attribute_record:

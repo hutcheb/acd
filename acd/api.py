@@ -129,7 +129,7 @@ class DumpCompsRecordsToFile(ExportProject):
     def extract(self):
         export = ExportL5x(self.filename)
         with open(
-            os.path.join(self.output_directory, export.project.target_name + ".log"),
+            os.path.join(self.output_directory, "output.log"),
             "w",
         ) as log_file:
             DumpCompsRecords(export._cur, 0).dump(log_file=log_file)

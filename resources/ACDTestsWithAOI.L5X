@@ -1,0 +1,580 @@
+﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<RSLogix5000Content SchemaRevision="1.0" SoftwareRevision="34.01" TargetName="ACDTests" TargetType="Controller" ContainsContext="false" ExportDate="Wed Jul 10 20:36:17 2024" ExportOptions="NoRawData L5KData DecoratedData ForceProtectedEncoding AllProjDocTrans">
+<Controller Use="Target" Name="ACDTests" ProcessorType="1756-L85E" MajorRev="34" MinorRev="11" ProjectCreationDate="Wed Jul 10 20:03:39 2024" LastModifiedDate="Wed Jul 10 20:35:41 2024" SFCExecutionControl="CurrentActive" SFCRestartPosition="MostRecent" SFCLastScan="DontScan" ProjectSN="16#1234_5678"
+ MatchProjectToController="true" CanUseRPIFromProducer="false" InhibitAutomaticFirmwareUpdate="0" PassThroughConfiguration="EnabledWithAppend" DownloadProjectDocumentationAndExtendedProperties="true" DownloadProjectCustomProperties="true" ReportMinorOverflow="false" AutoDiagsEnabled="true" WebServerEnabled="false">
+<Description>
+<![CDATA[Controller Description]]>
+</Description>
+<RedundancyInfo Enabled="false" KeepTestEditsOnSwitchOver="false"/>
+<Security Code="0" ChangesToDetect="16#ffff_ffff_ffff_ffff"/>
+<SafetyInfo/>
+<DataTypes>
+<DataType Name="UDT_Test" Family="NoFamily" Class="User">
+<Description>
+<![CDATA[UDT_Desacription]]>
+</Description>
+<Members>
+<Member Name="TestDINT" DataType="DINT" Dimension="0" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[TestDINT Description UDT]]>
+</Description>
+</Member>
+<Member Name="ZZZZZZZZZZUDT_Test1" DataType="SINT" Dimension="0" Radix="Decimal" Hidden="true" ExternalAccess="Read/Write"/>
+<Member Name="TestBOOL" DataType="BIT" Dimension="0" Radix="Decimal" Hidden="false" Target="ZZZZZZZZZZUDT_Test1" BitNumber="0" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Test Bool Description UDT]]>
+</Description>
+</Member>
+<Member Name="TestULINT" DataType="ULINT" Dimension="0" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Test ULINT Description UDT]]>
+</Description>
+</Member>
+</Members>
+</DataType>
+</DataTypes>
+<Modules>
+<Module Name="Local" CatalogNumber="1756-L85E" Vendor="1" ProductType="14" ProductCode="168" Major="34" Minor="11" ParentModule="Local" ParentModPortId="1" Inhibited="false" MajorFault="true"
+>
+<EKey State="Disabled"/>
+<Ports>
+<Port Id="1" Address="0" Type="ICP" Upstream="false">
+<Bus Size="7"/>
+</Port>
+<Port Id="2" Type="Ethernet" Upstream="false">
+<Bus/>
+</Port>
+</Ports>
+</Module>
+<Module Name="ETH_MODULE" CatalogNumber="1756-EN2T" Vendor="1" ProductType="12" ProductCode="166" Major="11" Minor="1" ParentModule="Local" ParentModPortId="1" Inhibited="false" MajorFault="false"
+>
+<Description>
+<![CDATA[ETH_MODULE Description]]>
+</Description>
+<EKey State="CompatibleModule"/>
+<Ports>
+<Port Id="1" Address="1" Type="ICP" Upstream="true"/>
+<Port Id="2" Address="192.168.1.2" Type="Ethernet" Upstream="false">
+<Bus/>
+</Port>
+</Ports>
+<Communications CommMethod="536870914">
+<Connections/>
+</Communications>
+<ExtendedProperties>
+<public><Vendor>Rockwell Automation/Allen-Bradley</Vendor><CatNum>1756-EN2T</CatNum><ConfigID>4325481</ConfigID></public>
+</ExtendedProperties>
+</Module>
+</Modules>
+<AddOnInstructionDefinitions>
+<AddOnInstructionDefinition Name="AddOnInstruction" Revision="1.7" RevisionExtension="ExtendedText" Vendor="ACD-TOOLS" ExecutePrescan="false" ExecutePostscan="false" ExecuteEnableInFalse="false" CreatedDate="2024-07-11T00:34:36.529Z" CreatedBy="WIN-H1KSAME0MKK\Hutcheson" EditedDate="2024-07-11T00:35:29.863Z" EditedBy="WIN-H1KSAME0MKK\Hutcheson"
+ SoftwareRevision="v34.01">
+<Description>
+<![CDATA[AddOnInstruction Description]]>
+</Description>
+<RevisionNote>
+<![CDATA[Revision Note Add On Instruction]]>
+</RevisionNote>
+<Parameters>
+<Parameter Name="EnableIn" TagType="Base" DataType="BOOL" Usage="Input" Radix="Decimal" Required="false" Visible="false" ExternalAccess="Read Only">
+<Description>
+<![CDATA[Enable Input - System Defined Parameter]]>
+</Description>
+</Parameter>
+<Parameter Name="EnableOut" TagType="Base" DataType="BOOL" Usage="Output" Radix="Decimal" Required="false" Visible="false" ExternalAccess="Read Only">
+<Description>
+<![CDATA[Enable Output - System Defined Parameter]]>
+</Description>
+</Parameter>
+</Parameters>
+<LocalTags>
+<LocalTag Name="AOIDINTLocalTag" DataType="DINT" Radix="Decimal" ExternalAccess="None">
+<Description>
+<![CDATA[AOILocalTagDescription]]>
+</Description>
+<DefaultData Format="L5K">
+<![CDATA[666]]>
+</DefaultData>
+<DefaultData Format="Decorated">
+<DataValue DataType="DINT" Radix="Decimal" Value="666"/>
+</DefaultData>
+</LocalTag>
+</LocalTags>
+<Routines>
+<Routine Name="Logic" Type="RLL">
+<RLLContent>
+<Rung Number="0" Type="N">
+<Text>
+<![CDATA[NOP();]]>
+</Text>
+</Rung>
+</RLLContent>
+</Routine>
+</Routines>
+</AddOnInstructionDefinition>
+</AddOnInstructionDefinitions>
+<Tags>
+<Tag Name="a5000_String32" TagType="Base" DataType="AB:5000_String32_Struct:I:0" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[[0,'$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00$00'
+		]]]>
+</Data>
+<Data Format="String" Length="0">
+<![CDATA['']]>
+</Data>
+</Tag>
+<Tag Name="AliasTag5000String32" TagType="Alias" Radix="Decimal" AliasFor="a5000_String32.LEN" ExternalAccess="Read/Write"/>
+<Tag Name="Constant" TagType="Base" DataType="DINT" Radix="Decimal" Constant="true" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="DATETIME_RadixDateTime" TagType="Base" DataType="DT" Radix="Date/Time" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DT" Radix="Date/Time" Value="DT#1970-01-01-00:00:00.000_000Z"/>
+</Data>
+</Tag>
+<Tag Name="DINT" TagType="Base" DataType="DINT" Radix="Decimal" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[DINT_DESCRIPTION]]>
+</Description>
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="INT" TagType="Base" DataType="INT" Radix="Decimal" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[INT Description]]>
+</Description>
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="INT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="LDATETIME_RadixNanoSec" TagType="Base" DataType="LDT" Radix="Date/Time (ns)" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="LDT" Radix="Date/Time (ns)" Value="LDT#1970-01-01-00:00:00.000_000_000Z"/>
+</Data>
+</Tag>
+<Tag Name="LTIME_RadixLTime" TagType="Base" DataType="LTIME" Radix="LTime (ns)" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="LTIME" Radix="LTime (ns)" Value="LT#0ns"/>
+</Data>
+</Tag>
+<Tag Name="NoAccess" TagType="Base" DataType="DINT" Radix="Decimal" Constant="false" ExternalAccess="None">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="RadixASCII" TagType="Base" DataType="DINT" Radix="ASCII" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="ASCII" Value="'$00$00$00$00'"/>
+</Data>
+</Tag>
+<Tag Name="RadixBinary" TagType="Base" DataType="DINT" Radix="Binary" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Binary" Value="2#0000_0000_0000_0000_0000_0000_0000_0000"/>
+</Data>
+</Tag>
+<Tag Name="RadixExponential" TagType="Base" DataType="REAL" Radix="Exponential" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0.00000000e+000]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="REAL" Radix="Exponential" Value="0.00000000e+000"/>
+</Data>
+</Tag>
+<Tag Name="RadixFloat" TagType="Base" DataType="REAL" Radix="Float" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0.00000000e+000]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="REAL" Radix="Float" Value="0.0"/>
+</Data>
+</Tag>
+<Tag Name="RadixHex" TagType="Base" DataType="DINT" Radix="Hex" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Hex" Value="16#0000_0000"/>
+</Data>
+</Tag>
+<Tag Name="RadixOctal" TagType="Base" DataType="DINT" Radix="Octal" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Octal" Value="8#00_000_000_000"/>
+</Data>
+</Tag>
+<Tag Name="ReadOnly" TagType="Base" DataType="DINT" Radix="Decimal" Constant="false" ExternalAccess="Read Only">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="TIME32_RadixTime32" TagType="Base" DataType="TIME32" Radix="Time32 (us)" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="TIME32" Radix="Time32 (us)" Value="T32#0us"/>
+</Data>
+</Tag>
+<Tag Name="TIME_RadixTimeUs" TagType="Base" DataType="TIME" Radix="Time (us)" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="TIME" Radix="Time (us)" Value="T#0us"/>
+</Data>
+</Tag>
+<Tag Name="UDINT" TagType="Base" DataType="UDINT" Radix="Decimal" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[UDINT Description]]>
+</Description>
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="UDINT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="UINT" TagType="Base" DataType="UINT" Radix="Decimal" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[UINT Description]]>
+</Description>
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="UINT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="ULINT" TagType="Base" DataType="ULINT" Radix="Decimal" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[ULINT Description]]>
+</Description>
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="ULINT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+</Tags>
+<Programs>
+<Program Name="MainProgram" TestEdits="false" MainRoutineName="MainRoutine" Disabled="false" UseAsFolder="false">
+<Tags>
+<Tag Name="AND_01" TagType="Base" DataType="FBD_LOGICAL" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[[1,0,0,0]]]>
+</Data>
+<Data Format="Decorated">
+<Structure DataType="FBD_LOGICAL">
+<DataValueMember Name="EnableIn" DataType="BOOL" Value="1"/>
+<DataValueMember Name="SourceA" DataType="DINT" Radix="Decimal" Value="0"/>
+<DataValueMember Name="SourceB" DataType="DINT" Radix="Decimal" Value="0"/>
+<DataValueMember Name="EnableOut" DataType="BOOL" Value="0"/>
+<DataValueMember Name="Dest" DataType="DINT" Radix="Decimal" Value="0"/>
+</Structure>
+</Data>
+</Tag>
+<Tag Name="BAND_01" TagType="Base" DataType="FBD_BOOLEAN_AND" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[[511,0,5.60519386e-045]]]>
+</Data>
+<Data Format="Decorated">
+<Structure DataType="FBD_BOOLEAN_AND">
+<DataValueMember Name="EnableIn" DataType="BOOL" Value="1"/>
+<DataValueMember Name="In1" DataType="BOOL" Value="1"/>
+<DataValueMember Name="In2" DataType="BOOL" Value="1"/>
+<DataValueMember Name="In3" DataType="BOOL" Value="1"/>
+<DataValueMember Name="In4" DataType="BOOL" Value="1"/>
+<DataValueMember Name="In5" DataType="BOOL" Value="1"/>
+<DataValueMember Name="In6" DataType="BOOL" Value="1"/>
+<DataValueMember Name="In7" DataType="BOOL" Value="1"/>
+<DataValueMember Name="In8" DataType="BOOL" Value="1"/>
+<DataValueMember Name="EnableOut" DataType="BOOL" Value="0"/>
+<DataValueMember Name="Out" DataType="BOOL" Value="0"/>
+</Structure>
+</Data>
+</Tag>
+<Tag Name="BOR_01" TagType="Base" DataType="FBD_BOOLEAN_OR" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[[1,0,5.60519386e-045]]]>
+</Data>
+<Data Format="Decorated">
+<Structure DataType="FBD_BOOLEAN_OR">
+<DataValueMember Name="EnableIn" DataType="BOOL" Value="1"/>
+<DataValueMember Name="In1" DataType="BOOL" Value="0"/>
+<DataValueMember Name="In2" DataType="BOOL" Value="0"/>
+<DataValueMember Name="In3" DataType="BOOL" Value="0"/>
+<DataValueMember Name="In4" DataType="BOOL" Value="0"/>
+<DataValueMember Name="In5" DataType="BOOL" Value="0"/>
+<DataValueMember Name="In6" DataType="BOOL" Value="0"/>
+<DataValueMember Name="In7" DataType="BOOL" Value="0"/>
+<DataValueMember Name="In8" DataType="BOOL" Value="0"/>
+<DataValueMember Name="EnableOut" DataType="BOOL" Value="0"/>
+<DataValueMember Name="Out" DataType="BOOL" Value="0"/>
+</Structure>
+</Data>
+</Tag>
+<Tag Name="MainProgramInputParameter" TagType="Base" DataType="DINT" Radix="Decimal" Usage="Input" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="MainProgramLocalTag" TagType="Base" DataType="DINT" Radix="Decimal" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[MainProgramLocalTagDescription]]>
+</Description>
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="MainProgramLocalTagNoAccess" TagType="Base" DataType="DINT" Radix="Decimal" Constant="false" ExternalAccess="None">
+<Description>
+<![CDATA[MainProgramLocalTagDescription]]>
+</Description>
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="MainProgramLocalTagReadOnly" TagType="Base" DataType="DINT" Radix="Decimal" Constant="false" ExternalAccess="Read Only">
+<Description>
+<![CDATA[MainProgramLocalTagDescription]]>
+</Description>
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="MainProgramOutputParameter" TagType="Base" DataType="DINT" Radix="Decimal" Usage="Output" Constant="false" ExternalAccess="Read Only">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="MainProgramPublicParameters" TagType="Base" DataType="DINT" Radix="Decimal" Usage="Public" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="Step_000" TagType="Base" DataType="SFC_STEP" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[[2097152,0,0,0,0,0,0]]]>
+</Data>
+<Data Format="Decorated">
+<Structure DataType="SFC_STEP">
+<DataValueMember Name="Status" DataType="DINT" Radix="Hex" Value="16#0020_0000"/>
+<DataValueMember Name="X" DataType="BOOL" Value="0"/>
+<DataValueMember Name="FS" DataType="BOOL" Value="0"/>
+<DataValueMember Name="SA" DataType="BOOL" Value="0"/>
+<DataValueMember Name="LS" DataType="BOOL" Value="0"/>
+<DataValueMember Name="DN" DataType="BOOL" Value="0"/>
+<DataValueMember Name="OV" DataType="BOOL" Value="0"/>
+<DataValueMember Name="AlarmEn" DataType="BOOL" Value="0"/>
+<DataValueMember Name="AlarmLow" DataType="BOOL" Value="0"/>
+<DataValueMember Name="AlarmHigh" DataType="BOOL" Value="0"/>
+<DataValueMember Name="Reset" DataType="BOOL" Value="0"/>
+<DataValueMember Name="PauseTimer" DataType="BOOL" Value="1"/>
+<DataValueMember Name="PRE" DataType="DINT" Radix="Decimal" Value="0"/>
+<DataValueMember Name="T" DataType="DINT" Radix="Decimal" Value="0"/>
+<DataValueMember Name="TMax" DataType="DINT" Radix="Decimal" Value="0"/>
+<DataValueMember Name="Count" DataType="DINT" Radix="Decimal" Value="0"/>
+<DataValueMember Name="LimitLow" DataType="DINT" Radix="Decimal" Value="0"/>
+<DataValueMember Name="LimitHigh" DataType="DINT" Radix="Decimal" Value="0"/>
+</Structure>
+</Data>
+</Tag>
+<Tag Name="Stop_000" TagType="Base" DataType="SFC_STOP" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[[0,0,0,0,0]]]>
+</Data>
+<Data Format="Decorated">
+<Structure DataType="SFC_STOP">
+<DataValueMember Name="Status" DataType="DINT" Radix="Hex" Value="16#0000_0000"/>
+<DataValueMember Name="X" DataType="BOOL" Value="0"/>
+<DataValueMember Name="Reset" DataType="BOOL" Value="0"/>
+<DataValueMember Name="Count" DataType="DINT" Radix="Decimal" Value="0"/>
+</Structure>
+</Data>
+</Tag>
+<Tag Name="Tran_000" TagType="Base" DataType="BOOL" Radix="Decimal" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="BOOL" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+</Tags>
+<Routines>
+<Routine Name="FBDRoutine" Type="FBD">
+<Description>
+<![CDATA[FBDRoutineDescription]]>
+</Description>
+<FBDContent SheetSize="B - 11 x 17 in" SheetOrientation="Landscape">
+<Sheet Number="1">
+<IRef ID="0" X="100" Y="100" Operand="DINT.0" HideDesc="false"/>
+<IRef ID="1" X="140" Y="140" Operand="DINT.1" HideDesc="false"/>
+<IRef ID="2" X="480" Y="200" Operand="DINT.3" HideDesc="false"/>
+<ORef ID="3" X="880" Y="140" Operand="DINT.4" HideDesc="false"/>
+<Block Type="BAND" ID="4" X="240" Y="80" Operand="BAND_01" VisiblePins="In1 In2 In3 In4 Out" HideDesc="false"/>
+<Block Type="BOR" ID="5" X="680" Y="100" Operand="BOR_01" VisiblePins="In1 In2 In3 In4 Out" HideDesc="false"/>
+<Wire FromID="0" ToID="4" ToParam="In1"/>
+<Wire FromID="1" ToID="4" ToParam="In2"/>
+<Wire FromID="2" ToID="5" ToParam="In2"/>
+<Wire FromID="4" FromParam="Out" ToID="5" ToParam="In1"/>
+<Wire FromID="5" FromParam="Out" ToID="3"/>
+</Sheet>
+<Sheet Number="2">
+<IRef ID="6" X="120" Y="100" Operand="DINT" HideDesc="false"/>
+<ORef ID="7" X="420" Y="120" Operand="UDINT" HideDesc="false"/>
+<Block Type="AND" ID="8" X="180" Y="80" Operand="AND_01" VisiblePins="SourceA SourceB Dest" HideDesc="false"/>
+<Wire FromID="6" ToID="8" ToParam="SourceA"/>
+<Wire FromID="6" ToID="8" ToParam="SourceB"/>
+<Wire FromID="8" FromParam="Dest" ToID="7"/>
+<TextBox ID="9" X="580" Y="240" Width="0">
+<Text>
+<![CDATA[Im a Text Box In the Middle of Nowhere
+]]>
+</Text>
+</TextBox>
+</Sheet>
+</FBDContent>
+</Routine>
+<Routine Name="MainRoutine" Type="RLL">
+<RLLContent>
+<Rung Number="0" Type="N">
+<Comment>
+<![CDATA[Im a Rung Comment]]>
+</Comment>
+<Text>
+<![CDATA[NOP();]]>
+</Text>
+</Rung>
+<Rung Number="1" Type="N">
+<Text>
+<![CDATA[XIC(DINT.0)OTE(DINT.2);]]>
+</Text>
+</Rung>
+<Rung Number="2" Type="N">
+<Text>
+<![CDATA[XIC(DINT.2)OTE(DINT.3);]]>
+</Text>
+</Rung>
+</RLLContent>
+</Routine>
+<Routine Name="SequentialFunctionChart" Type="SFC">
+<Description>
+<![CDATA[SequenceFunctionChartRoutineDescription]]>
+</Description>
+<SFCContent SheetSize="Letter - 8.5 x 11 in" SheetOrientation="Landscape" StepName="Step" TransitionName="Tran" ActionName="Action" StopName="Stop">
+<Step ID="0" X="200" Y="100" Operand="Step_000" HideDesc="false" DescX="240" DescY="80" DescWidth="0" InitialStep="true" PresetUsesExpr="false" LimitHighUsesExpr="false"
+ LimitLowUsesExpr="false" ShowActions="true"/>
+<Transition ID="1" X="200" Y="180" Operand="Tran_000" HideDesc="false" DescX="260" DescY="160" DescWidth="0">
+<Condition>
+<STContent>
+<Line Number="0">
+<![CDATA[DINT = DINT]]>
+</Line>
+</STContent>
+</Condition>
+</Transition>
+<Stop ID="2" X="200" Y="380" Operand="Stop_000" HideDesc="false" DescX="280" DescY="360" DescWidth="0"/>
+<DirectedLink FromID="0" ToID="1" Show="true"/>
+<DirectedLink FromID="1" ToID="2" Show="true"/>
+</SFCContent>
+</Routine>
+<Routine Name="STRoutine" Type="ST">
+<Description>
+<![CDATA[STRoutineDescrioption]]>
+</Description>
+<STContent>
+<Line Number="0">
+<![CDATA[DINT := DINT AND UDINT; // Line 1 COmment]]>
+</Line>
+<Line Number="1">
+<![CDATA[DINT := DINT AND ULINT; // Line 2 Comment]]>
+</Line>
+<Line Number="2">
+<![CDATA[]]>
+</Line>
+<Line Number="3">
+<![CDATA[// Random Comment]]>
+</Line>
+<Line Number="4">
+<![CDATA[]]>
+</Line>
+<Line Number="5">
+<![CDATA[]]>
+</Line>
+</STContent>
+</Routine>
+</Routines>
+</Program>
+</Programs>
+<Tasks>
+<Task Name="MainTask" Type="CONTINUOUS" Priority="10" Watchdog="500" DisableUpdateOutputs="false" InhibitTask="false">
+<ScheduledPrograms>
+<ScheduledProgram Name="MainProgram"/>
+</ScheduledPrograms>
+</Task>
+</Tasks>
+<CST MasterID="0"/>
+<WallClockTime LocalTimeAdjustment="0" TimeZone="0"/>
+<Trends/>
+<DataLogs/>
+<TimeSynchronize Priority1="128" Priority2="128" PTPEnable="false"/>
+<EthernetPorts>
+<EthernetPort Port="1" Label="1" PortEnabled="true"/>
+</EthernetPorts>
+</Controller>
+</RSLogix5000Content>
