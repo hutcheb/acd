@@ -31,7 +31,7 @@ from acd.api import ImportProjectFromFile
 controller = ImportProjectFromFile("../resources/CuteLogix.ACD").import_project().controller
 rung = controller.programs[0].routines[0].rungs[0]
 data_type = controller.data_types[-1]
-tag_name = controller.tags[75].text
+tag_name = controller.tags[75].name
 tag_data_type =  controller.tags[75].data_type
 ```
 
