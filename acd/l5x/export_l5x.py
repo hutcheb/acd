@@ -147,6 +147,7 @@ class ExportL5x:
         self._cur.execute("CREATE INDEX idx_rungs_object_id ON rungs(object_id)")
         self._cur.execute("CREATE INDEX idx_region_map_parent_id ON region_map(parent_id)")
         self._cur.execute("CREATE INDEX idx_comments_parent ON comments(parent)")
+        self._cur.execute("CREATE INDEX idx_nameless_parent_id ON nameless(parent_id)")
         self._db.commit()
 
     @property
