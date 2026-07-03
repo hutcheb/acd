@@ -3,6 +3,8 @@ import os
 import re
 import shutil
 import struct
+
+from loguru import logger as log
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -2238,11 +2240,17 @@ class TaskBuilder(L5xElementBuilder):
         rate_str = str(rate_us // 1000) if task_type != "CONTINUOUS" else None
 
         # Scheduled programs: ext[0x01] value starts at BLOB offset 0x5A.
-        # Format: u16 count followed by N u32 comment_ids.
+        # Format: u16 count followed by N u32 comment_ids. The count is
+        # bounds-checked against the record: some firmware versions lay the
+        # record out differently and a garbage count must not read past the
+        # end of the buffer.
         prog_count = struct.unpack_from("<H", record, 0x5A)[0]
         scheduled_programs = []
         for i in range(prog_count):
-            cid = struct.unpack_from("<I", record, 0x5A + 2 + i * 4)[0]
+            offset = 0x5A + 2 + i * 4
+            if offset + 4 > len(record):
+                break
+            cid = struct.unpack_from("<I", record, offset)[0]
             prog_name = comment_id_to_program.get(cid)
             if prog_name:
                 scheduled_programs.append(ScheduledProgram(prog_name, prog_name))
@@ -2468,7 +2476,14 @@ class ControllerBuilder(L5xElementBuilder):
                 + " AND record_type=256"
             )
             for task_result in self._cur.fetchall():
-                tasks.append(TaskBuilder(self._cur, task_result[1]).build(comment_id_to_program))
+                try:
+                    tasks.append(
+                        TaskBuilder(self._cur, task_result[1]).build(comment_id_to_program)
+                    )
+                except Exception as e:
+                    # Task config offsets are firmware-version dependent; a
+                    # task that can't decode shouldn't abort the whole import.
+                    log.warning(f"Skipping undecodable task '{task_result[0]}': {e!r}")
 
         # Get the AOI Collection and get the AOIs
         self._cur.execute(

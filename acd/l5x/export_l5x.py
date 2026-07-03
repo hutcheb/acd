@@ -23,6 +23,40 @@ from acd.record.nameless import NamelessRecord
 from acd.record.sbregion import SbRegionRecord
 
 
+def _parse_records(dat_path: str, parse_one, label: str) -> List[tuple]:
+    """Parse every record of a .Dat file, skipping records that fail.
+
+    Real-world ACDs (notably newer firmware like V33+) routinely contain a
+    handful of records the parsers don't understand yet; aborting the whole
+    import over one bad record makes the library unusable on those files.
+    Failures are counted and reported as a single warning instead. A missing
+    or wholly unreadable .Dat file degrades to an empty table the same way.
+    Returns the list of successfully parsed non-None tuples."""
+    if not os.path.exists(dat_path):
+        log.warning(f"{label}: file not found at {dat_path} - skipping")
+        return []
+    try:
+        records = DbExtract(dat_path).read().records.record
+    except Exception as e:
+        log.warning(f"{label}: unreadable database file ({e!r}) - skipping")
+        return []
+    out: List[tuple] = []
+    failed = 0
+    for record in records:
+        try:
+            t = parse_one(record)
+        except Exception:
+            failed += 1
+            continue
+        if t is not None:
+            out.append(t)
+    if failed:
+        log.warning(
+            f"{label}: skipped {failed} unparseable record(s) of {len(records)}"
+        )
+    return out
+
+
 @dataclass
 class ExportL5x:
     input_filename: os.PathLike
@@ -90,19 +124,18 @@ class ExportL5x:
                 self._raw_files[record.filename] = acd_fh.read(record.file_length)
 
         log.info("Getting records from ACD Comps file and storing in sqllite database")
-        comps_db = DbExtract(os.path.join(self._temp_dir, "Comps.Dat")).read()
         # Deduplicate by object_id. When duplicate object_ids exist (e.g. a routine that
         # appears twice in Comps.Dat with different record_type values), keep the entry
         # with the largest record because the smaller/later entry is typically a truncated
         # or partial record (e.g. record_type=271 vs 259 for routines) that fails to parse
         # correctly with RxGeneric. The full record is always the largest one.
         comps_by_id = {}
-        for record in comps_db.records.record:
-            t = CompsRecord.parse(record)
-            if t is not None:
-                oid = t[0]
-                if oid not in comps_by_id or len(t[5]) > len(comps_by_id[oid][5]):
-                    comps_by_id[oid] = t
+        for t in _parse_records(
+            os.path.join(self._temp_dir, "Comps.Dat"), CompsRecord.parse, "Comps"
+        ):
+            oid = t[0]
+            if oid not in comps_by_id or len(t[5]) > len(comps_by_id[oid][5]):
+                comps_by_id[oid] = t
         self._cur.executemany("INSERT INTO comps VALUES (?,?,?,?,?,?)", comps_by_id.values())
         self._db.commit()
 
@@ -119,24 +152,33 @@ class ExportL5x:
         log.info(
             "Getting records from ACD SbRegion file and storing in sqllite database"
         )
-        sb_region_db = DbExtract(os.path.join(self._temp_dir, "SbRegion.Dat")).read()
-        rung_tuples = [t for record in sb_region_db.records.record if (t := SbRegionRecord.parse(record, name_lookup)) is not None]
+        rung_tuples = _parse_records(
+            os.path.join(self._temp_dir, "SbRegion.Dat"),
+            lambda record: SbRegionRecord.parse(record, name_lookup),
+            "SbRegion",
+        )
         self._cur.executemany("INSERT INTO rungs VALUES (?,?,?)", rung_tuples)
         self._db.commit()
 
         log.info(
             "Getting records from ACD Comments file and storing in sqllite database"
         )
-        comments_db = DbExtract(os.path.join(self._temp_dir, "Comments.Dat")).read()
-        comment_tuples = [t for record in comments_db.records.record if (t := CommentsRecord.parse(record)) is not None]
+        comment_tuples = _parse_records(
+            os.path.join(self._temp_dir, "Comments.Dat"),
+            CommentsRecord.parse,
+            "Comments",
+        )
         self._cur.executemany("INSERT INTO comments VALUES (?,?,?,?,?,?,?,?,?)", comment_tuples)
         self._db.commit()
 
         log.info(
             "Getting records from ACD Nameless file and storing in sqllite database"
         )
-        nameless_db = DbExtract(os.path.join(self._temp_dir, "Nameless.Dat")).read()
-        nameless_tuples = [t for record in nameless_db.records.record if (t := NamelessRecord.parse(record)) is not None]
+        nameless_tuples = _parse_records(
+            os.path.join(self._temp_dir, "Nameless.Dat"),
+            NamelessRecord.parse,
+            "Nameless",
+        )
         self._cur.executemany("INSERT INTO nameless VALUES (?,?,?)", nameless_tuples)
         self._db.commit()
 
