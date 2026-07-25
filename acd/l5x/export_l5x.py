@@ -178,48 +178,71 @@ class ExportL5x:
             return
         record = results[0][3]
 
-        identifier_offset = 70
+        self._cur.executemany(
+            "INSERT INTO region_map VALUES (?, ?, ?, ?, ?)",
+            self._parse_region_map(record),
+        )
+        self._db.commit()
 
-        if len(record) < (identifier_offset + 8):
-            return
+    @staticmethod
+    def _parse_region_map(record):
+        # Current empty projects use a header-only Region Map without a length
+        # field or entries.
+        if len(record) == 0x4A:
+            return []
 
-        region_length = struct.unpack(
-            "I", record[identifier_offset + 4 : identifier_offset + 8]
-        )[0]
+        # Legacy records have a 28-byte prefix and count bytes after that
+        # prefix. Modern records have a 78-byte prefix and include four bytes
+        # preceding the entries in their stored length.
+        if (
+            len(record) >= 78
+            and struct.unpack_from("<I", record, 0x4A)[0]
+            == len(record) - 0x4A
+        ):
+            identifier_offset = 0x4E
+            entries_length = struct.unpack_from("<I", record, 0x4A)[0] - 4
+            # Current records can carry a 12-byte non-entry trailer.
+            allowed_trailer_lengths = (0, 12)
+        else:
+            legacy_length = (
+                struct.unpack_from("<I", record, 0x18)[0]
+                if len(record) >= 28
+                else 0
+            )
+            if legacy_length not in (
+                len(record) - 0x1C,
+                len(record) - 0x18,
+            ):
+                raise ValueError("Invalid Region Map length")
+            identifier_offset = 0x1C
+            entries_length = len(record) - identifier_offset
+            allowed_trailer_lengths = (0,)
 
-        identifier_offset = 78
-        record_length_absolute = identifier_offset + region_length - 4
-        c = 0
-        while identifier_offset <= (record_length_absolute - 16):
-            parent_id_identifier = struct.unpack(
-                "I", record[identifier_offset : identifier_offset + 4]
-            )[0]
-
-            unknown_identifier = struct.unpack(
-                "I", record[identifier_offset + 4 : identifier_offset + 8]
-            )[0]
-
-            seq_identifier = struct.unpack(
-                "I", record[identifier_offset + 8 : identifier_offset + 12]
-            )[0]
-
-            c += 1
-            object_id_identifier = struct.unpack(
-                "I", record[identifier_offset + 12 : identifier_offset + 16]
-            )[0]
-
-            query: str = "INSERT INTO region_map VALUES (?, ?, ?, ?, ?)"
-            enty: tuple = (
-                object_id_identifier,
+        trailer_length = entries_length % 16
+        if trailer_length not in allowed_trailer_lengths:
+            raise ValueError("Invalid Region Map entry length")
+        record_end = identifier_offset + entries_length - trailer_length
+        entries = []
+        while identifier_offset + 16 <= record_end:
+            (
                 parent_id_identifier,
                 unknown_identifier,
                 seq_identifier,
-                record[identifier_offset : identifier_offset + 16],
+                object_id_identifier,
+            ) = struct.unpack_from(
+                "<IIII", record, identifier_offset
             )
-            self._cur.execute(query, enty)
+            entries.append(
+                (
+                    object_id_identifier,
+                    parent_id_identifier,
+                    unknown_identifier,
+                    seq_identifier,
+                    record[identifier_offset : identifier_offset + 16],
+                )
+            )
             identifier_offset += 16
-
-        self._db.commit()
+        return entries
 
 
 if __name__ == "__main__":

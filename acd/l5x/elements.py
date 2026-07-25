@@ -11,9 +11,9 @@ from pathlib import Path
 from sqlite3 import Cursor
 from typing import List, Tuple, Dict, Union
 
-from acd.generated.comps.rx_generic import RxGeneric
 from acd.l5x.catalog_numbers import CATALOG_NUMBERS
 from acd.l5x.port_structures import PORT_STRUCTURES
+from acd.record.rx import LegacyRxGeneric, RxGeneric
 
 
 # Characters that are illegal in XML 1.0: everything outside
@@ -425,10 +425,43 @@ def _generate_decorated(dt_base: str, dimensions: Union[str, None],
 
 
 @dataclass
+class ProduceInfo(L5xElement):
+    produce_count: str
+    programmatically_send_event_trigger: str
+    unicast_permitted: str
+    minimum_rpi: str
+    maximum_rpi: str
+    default_rpi: str
+
+    def __post_init__(self):
+        super().__post_init__()
+        self._export_name = "ProduceInfo"
+        self._xml_attr_overrides = {
+            "minimum_rpi": "MinimumRPI",
+            "maximum_rpi": "MaximumRPI",
+            "default_rpi": "DefaultRPI",
+        }
+
+
+@dataclass
+class ConsumeInfo(L5xElement):
+    producer: str
+    remote_tag: str
+    remote_instance: str
+    rpi: str
+    unicast: str
+
+    def __post_init__(self):
+        super().__post_init__()
+        self._export_name = "ConsumeInfo"
+        self._xml_attr_overrides = {"rpi": "RPI"}
+
+
+@dataclass
 class Tag(L5xElement):
     name: str
     tag_type: str
-    data_type: str
+    data_type: Union[str, None]
     radix: Union[str, None]
     external_access: str
     constant: Union[str, None]  # "true" for constants; None omits the attribute
@@ -436,6 +469,9 @@ class Tag(L5xElement):
     _data_table_instance: int
     _comments: List[Tuple[str, str]]
     _data_types_map: Dict[str, "DataType"] = field(default_factory=dict)
+    alias_for: Union[str, None] = None
+    produce_info: Union[ProduceInfo, None] = None
+    consume_info: Union[ConsumeInfo, None] = None
 
     @property
     def _l5x_exclude(self) -> bool:
@@ -446,6 +482,7 @@ class Tag(L5xElement):
             or ":" in self.name
             or self.name.startswith("__l0")
             or self.name.startswith("__CLONE")
+            or self.name.startswith("__SL")
         )
 
     @staticmethod
@@ -497,8 +534,16 @@ class Tag(L5xElement):
             return base
 
         # Insert Description (if any) then Data (if any) immediately after the opening tag.
-        idx = base.index(">")
-        return base[:idx + 1] + desc_xml + data_xml + base[idx + 1:]
+        opening_end = base.index(">") + 1
+        if desc_xml:
+            base = base[:opening_end] + desc_xml + base[opening_end:]
+
+        insert_at = opening_end + len(desc_xml)
+        for child_name in ("ProduceInfo", "ConsumeInfo"):
+            child_end = base.find(f"</{child_name}>", insert_at)
+            if child_end >= 0:
+                insert_at = child_end + len(child_name) + 3
+        return base[:insert_at] + data_xml + base[insert_at:]
 
 
 @dataclass
@@ -1525,6 +1570,239 @@ class ModuleBuilder(L5xElementBuilder):
 
 @dataclass
 class TagBuilder(L5xElementBuilder):
+    @staticmethod
+    def _format_rpi(microseconds: int) -> str:
+        if microseconds % 1000 == 0:
+            return str(microseconds // 1000)
+        return f"{microseconds / 1000:.3f}"
+
+    def _legacy_connection_descriptor(
+        self, attribute_id: int, descriptor_kind: int
+    ) -> bytes:
+        self._cur.execute(
+            "SELECT record FROM comps WHERE length(record) >= 10 "
+            "AND hex(substr(record, 9, 2)) = '7E00'"
+        )
+        matches = []
+        for (raw_record,) in self._cur.fetchall():
+            try:
+                parsed = RxGeneric.from_bytes(raw_record)
+            except Exception:
+                continue
+            if parsed.cip_type != 0x7E:
+                continue
+            attributes = {
+                item.attribute_id: bytes(item.value)
+                for item in parsed.extended_records
+            }
+            reference = attributes.get(attribute_id, b"")
+            data = attributes.get(0x01, b"")
+            if (
+                len(reference) >= 4
+                and struct.unpack_from("<I", reference)[0] == self._object_id
+                and len(data) >= 2
+                and struct.unpack_from("<H", data)[0] == descriptor_kind
+            ):
+                matches.append(data)
+        if len(matches) != 1:
+            raise ValueError("Tag does not have exactly one connection descriptor")
+        return matches[0]
+
+    def _legacy_linked_data(self, extended_records: Dict[int, bytes]):
+        link = extended_records.get(0x6B, b"")
+        if len(link) < 4:
+            raise ValueError("Tag connection does not reference linked data")
+        linked_id = struct.unpack_from("<I", link)[0]
+        self._cur.execute(
+            "SELECT record FROM comps WHERE object_id=?",
+            (linked_id,),
+        )
+        row = self._cur.fetchone()
+        if not row:
+            raise ValueError("Tag connection linked data does not exist")
+        linked = RxGeneric.from_bytes(row[0])
+        attributes = {
+            item.attribute_id: bytes(item.value)
+            for item in linked.extended_records
+        }
+        metadata = attributes.get(0x64, b"")
+        if len(metadata) < 4:
+            raise ValueError("Tag connection linked data is incomplete")
+        return linked, struct.unpack_from("<I", metadata)[0]
+
+    def _legacy_processor_minimum_rpi(self) -> int:
+        self._cur.execute("SELECT record FROM comps WHERE comp_name='Local'")
+        for (raw_record,) in self._cur.fetchall():
+            try:
+                parsed = RxGeneric.from_bytes(raw_record)
+            except Exception:
+                continue
+            if parsed.cip_type != 0x69:
+                continue
+            attributes = {
+                item.attribute_id: bytes(item.value)
+                for item in parsed.extended_records
+            }
+            metadata = attributes.get(0x01, b"")
+            if len(metadata) >= 8:
+                device = struct.unpack_from("<HHH", metadata, 2)
+                if device == (1, 14, 72):
+                    return 1000
+        return 0
+
+    def _legacy_produce_info(
+        self,
+        extended_records: Dict[int, bytes],
+    ) -> ProduceInfo:
+        data = self._legacy_connection_descriptor(0x191, 0x0A)
+        linked, element_size = self._legacy_linked_data(extended_records)
+        if len(data) < 0x156 or struct.unpack_from("<H", data)[0] != 0x0A:
+            raise ValueError(
+                f"Invalid produced tag descriptor for object {self._object_id}"
+            )
+        if struct.unpack_from("<I", data, 0x1A)[0] != element_size:
+            raise ValueError("Produced tag descriptor has the wrong element size")
+        if struct.unpack_from("<I", data, 0x1E)[0] != linked.unique_tag_identifier:
+            raise ValueError("Produced tag descriptor has the wrong linked data")
+
+        minimum_rpi = max(
+            struct.unpack_from("<I", data, len(data) - 0x10)[0],
+            self._legacy_processor_minimum_rpi(),
+        )
+        maximum_rpi = struct.unpack_from("<I", data, len(data) - 0x0C)[0]
+        default_rpi = struct.unpack_from("<I", data, len(data) - 0x08)[0]
+        return ProduceInfo(
+            "ProduceInfo",
+            str(struct.unpack_from("<H", data, 0x141)[0]),
+            "true" if struct.unpack_from("<I", data, 0x134)[0] else "false",
+            "true" if data[0x144] else "false",
+            self._format_rpi(minimum_rpi),
+            self._format_rpi(maximum_rpi),
+            self._format_rpi(default_rpi),
+        )
+
+    def _legacy_consume_info(
+        self,
+        extended_records: Dict[int, bytes],
+    ) -> ConsumeInfo:
+        data = self._legacy_connection_descriptor(0x190, 0x09)
+        linked, element_size = self._legacy_linked_data(extended_records)
+        if len(data) <= 0x143 or struct.unpack_from("<H", data)[0] != 0x09:
+            raise ValueError(
+                f"Invalid consumed tag descriptor for object {self._object_id}"
+            )
+        if struct.unpack_from("<I", data, 0x0C)[0] != element_size:
+            raise ValueError("Consumed tag descriptor has the wrong element size")
+        if struct.unpack_from("<I", data, 0x10)[0] != linked.unique_tag_identifier:
+            raise ValueError("Consumed tag descriptor has the wrong linked data")
+
+        remote_name_length = struct.unpack_from("<H", data, 0x22)[0]
+        remote_name_end = 0x24 + remote_name_length
+        if remote_name_end > len(data):
+            raise ValueError("Consumed tag descriptor has an invalid remote tag")
+        remote_tag = data[0x24:remote_name_end].decode("utf-8")
+        unicast_value = data[0x143]
+        if unicast_value not in (1, 2):
+            raise ValueError("Consumed tag descriptor has an invalid unicast value")
+
+        producer_reference = extended_records.get(0x66, b"")
+        if len(producer_reference) < 4:
+            raise ValueError("Consumed tag does not reference a producer")
+        producer_id = struct.unpack_from("<I", producer_reference)[0]
+        self._cur.execute(
+            "SELECT comp_name FROM comps WHERE object_id=?",
+            (producer_id,),
+        )
+        producer_row = self._cur.fetchone()
+        if not producer_row:
+            raise ValueError("Consumed tag producer does not exist")
+
+        return ConsumeInfo(
+            "ConsumeInfo",
+            producer_row[0],
+            remote_tag,
+            str(struct.unpack_from("<H", data, 0x06)[0]),
+            self._format_rpi(struct.unpack_from("<I", data, 0x02)[0]),
+            "true" if unicast_value == 2 else "false",
+        )
+
+    def _legacy_data_type(self, record: LegacyRxGeneric) -> str:
+        self._cur.execute(
+            "SELECT comp_name, record FROM comps WHERE object_id=?",
+            (record.data_instance_id,),
+        )
+        data_row = self._cur.fetchone()
+        if data_row:
+            raw_data_record = bytes(data_row[1])
+            legacy_cip_type = (
+                struct.unpack_from("<H", raw_data_record, 8)[0]
+                if len(raw_data_record) >= 10
+                else 0
+            )
+            if legacy_cip_type == 0x8D:
+                return "MESSAGE"
+            if legacy_cip_type == 0xB0:
+                return "MOTION_GROUP"
+            if legacy_cip_type == 0xB1:
+                if record.main_record.runtime_type & 0xFF == 0xC7:
+                    return "AXIS_SERVO_DRIVE"
+                return "AXIS_SERVO"
+            try:
+                data_record = RxGeneric.from_bytes(raw_data_record)
+                if data_record.cip_type == 0x6A:
+                    self._cur.execute(
+                        "SELECT comp_name FROM comps WHERE object_id=?",
+                        (data_record.data_instance_id,),
+                    )
+                    type_row = self._cur.fetchone()
+                    if type_row:
+                        return type_row[0]
+            except Exception:
+                pass
+
+        atomic_types = {
+            0xC1: "BOOL",
+            0xC2: "SINT",
+            0xC3: "INT",
+            0xC4: "DINT",
+            0xC5: "LINT",
+            0xC6: "USINT",
+            0xC7: "UINT",
+            0xC8: "UDINT",
+            0xC9: "ULINT",
+            0xCA: "REAL",
+            0xCB: "LREAL",
+        }
+        return atomic_types.get(record.main_record.runtime_type & 0xFF, "")
+
+    def _legacy_alias_for(self, value: bytes) -> str:
+        if len(value) % 2 or not value.endswith(b"\x00\x00"):
+            raise ValueError("Invalid legacy alias path")
+        path = value.decode("utf-16-le").rstrip("\x00")
+
+        def replace_object_id(match):
+            object_id = int(match.group(1), 16)
+            self._cur.execute(
+                "SELECT comp_name, record FROM comps WHERE object_id=?",
+                (object_id,),
+            )
+            row = self._cur.fetchone()
+            if not row:
+                raise ValueError("Legacy alias target does not exist")
+            try:
+                target = RxGeneric.from_bytes(row[1])
+                logical_name = getattr(target, "logical_name", "")
+                if logical_name:
+                    return logical_name
+            except Exception:
+                pass
+            return row[0]
+
+        resolved = re.sub(r"@([0-9a-fA-F]{8})@", replace_object_id, path)
+        if re.search(r"@[0-9a-fA-F]{8}@", resolved):
+            raise ValueError("Legacy alias target could not be resolved")
+        return resolved
+
     def build(self) -> Tag:
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
@@ -1545,7 +1823,7 @@ class TagBuilder(L5xElementBuilder):
 
         try:
             r = RxGeneric.from_bytes(raw_rec)
-        except Exception as e:
+        except Exception:
             return Tag(
                 results[0][0], results[0][0], "Base", "", None, external_access, constant, None, 0, []
             )
@@ -1554,15 +1832,6 @@ class TagBuilder(L5xElementBuilder):
             return Tag(
                 results[0][0], results[0][0], "Base", "", None, external_access, constant, None, 0, []
             )
-        if r.main_record.data_type == 0xFFFFFFFF:
-            data_type = ""
-        else:
-            self._cur.execute(
-                "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
-                + str(r.main_record.data_type)
-            )
-            data_type_results = self._cur.fetchall()
-            data_type = data_type_results[0][0]
 
         self._cur.execute(
             "SELECT tag_reference, record_string FROM comments WHERE parent="
@@ -1575,6 +1844,84 @@ class TagBuilder(L5xElementBuilder):
             extended_records[extended_record.attribute_id] = bytes(
                 extended_record.value
             )
+
+        if isinstance(r, LegacyRxGeneric):
+            metadata_name = r.logical_name
+            name = metadata_name or results[0][0]
+            radix = (
+                radix_enum(r.main_record.radix)
+                if r.main_record.radix
+                else None
+            )
+            external_access = external_access_enum(r.main_record.external_access)
+
+            if 0x65 in extended_records:
+                return Tag(
+                    name,
+                    name,
+                    "Alias",
+                    None,
+                    radix,
+                    external_access,
+                    None,
+                    None,
+                    r.main_record.data_table_instance,
+                    comment_results,
+                    alias_for=self._legacy_alias_for(extended_records[0x65]),
+                )
+
+            data_type = self._legacy_data_type(r)
+            dimensions = [
+                r.main_record.dimension_1,
+                r.main_record.dimension_2,
+                r.main_record.dimension_3,
+            ]
+            if (
+                data_type == "BOOL"
+                and r.main_record.runtime_type == 0x20D3
+                and dimensions[0] == 1
+            ):
+                dimensions[0] = 32
+            dimension_text = ",".join(
+                str(dimension) for dimension in dimensions if dimension
+            ) or None
+            tag_type = "Base"
+            if 0x6B in extended_records and ":" not in name:
+                tag_type = "Consumed" if 0x66 in extended_records else "Produced"
+            produce_info = (
+                self._legacy_produce_info(extended_records)
+                if tag_type == "Produced"
+                else None
+            )
+            consume_info = (
+                self._legacy_consume_info(extended_records)
+                if tag_type == "Consumed"
+                else None
+            )
+            return Tag(
+                name,
+                name,
+                tag_type,
+                data_type,
+                radix,
+                external_access,
+                "false" if tag_type == "Produced" else None,
+                dimension_text,
+                r.main_record.data_table_instance,
+                comment_results,
+                produce_info=produce_info,
+                consume_info=consume_info,
+            )
+
+        if r.main_record.data_type == 0xFFFFFFFF:
+            data_type = ""
+        else:
+            self._cur.execute(
+                "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
+                + str(r.main_record.data_type)
+            )
+            data_type_results = self._cur.fetchall()
+            data_type = data_type_results[0][0] if data_type_results else ""
 
         if 0x01 not in extended_records:
             # Name comes from comp_name in the database; radix from main_record
@@ -2217,6 +2564,23 @@ class ProgramBuilder(L5xElementBuilder):
 _TASK_TYPE_MAP = {1: "EVENT", 2: "PERIODIC", 4: "CONTINUOUS"}
 
 
+def _program_schedule_id(record: bytes) -> int:
+    parsed = RxGeneric.from_bytes(record)
+    if isinstance(parsed, LegacyRxGeneric):
+        metadata = next(
+            (
+                bytes(item.value)
+                for item in parsed.extended_records
+                if item.attribute_id == 0x01
+            ),
+            b"",
+        )
+        if len(metadata) < 271:
+            raise ValueError("Program record does not contain a schedule ID")
+        return struct.unpack_from("<I", metadata, 267)[0]
+    return parsed.comment_id
+
+
 @dataclass
 class TaskBuilder(L5xElementBuilder):
     def build(self, comment_id_to_program: Dict[int, str]) -> Task:
@@ -2228,21 +2592,49 @@ class TaskBuilder(L5xElementBuilder):
 
         # All task config fields live within ext[0x01], accessed via absolute BLOB offsets.
         # These offsets were reverse-engineered from CIPDemo_RevEng.ACD.
-        rate_us = struct.unpack_from("<I", record, 0x106C)[0]
-        type_val = struct.unpack_from("<H", record, 0x10F6)[0]
-        priority = struct.unpack_from("<H", record, 0x10F8)[0]
-        watchdog_us = struct.unpack_from("<I", record, 0x110A)[0]
-        disable_update = record[0x112E]
+        if len(record) > 0x112E:
+            task_data = record
+            rate_offset = 0x106C
+            type_offset = 0x10F6
+            priority_offset = 0x10F8
+            watchdog_offset = 0x110A
+            disable_update = record[0x112E]
+            program_offset = 0x5A
+        else:
+            parsed = RxGeneric.from_bytes(record)
+            attributes = {
+                item.attribute_id: bytes(item.value)
+                for item in parsed.extended_records
+            }
+            task_data = attributes.get(0x01, b"")
+            if len(task_data) < 806:
+                raise ValueError("Task record does not contain configuration data")
+            rate_offset = 514
+            type_offset = 652
+            priority_offset = 654
+            watchdog_offset = 802
+            disable_update = 0
+            program_offset = 0
+
+        rate_us = struct.unpack_from("<I", task_data, rate_offset)[0]
+        type_val = struct.unpack_from("<H", task_data, type_offset)[0]
+        priority = struct.unpack_from("<H", task_data, priority_offset)[0]
+        watchdog_us = struct.unpack_from("<I", task_data, watchdog_offset)[0]
 
         task_type = _TASK_TYPE_MAP.get(type_val, "PERIODIC")
         rate_str = str(rate_us // 1000) if task_type != "CONTINUOUS" else None
 
         # Scheduled programs: ext[0x01] value starts at BLOB offset 0x5A.
         # Format: u16 count followed by N u32 comment_ids.
-        prog_count = struct.unpack_from("<H", record, 0x5A)[0]
+        prog_count = struct.unpack_from("<H", task_data, program_offset)[0]
+        max_program_count = (rate_offset - program_offset - 2) // 4
+        if prog_count > max_program_count:
+            raise ValueError("Task record contains too many scheduled programs")
         scheduled_programs = []
         for i in range(prog_count):
-            cid = struct.unpack_from("<I", record, 0x5A + 2 + i * 4)[0]
+            cid = struct.unpack_from(
+                "<I", task_data, program_offset + 2 + i * 4
+            )[0]
             prog_name = comment_id_to_program.get(cid)
             if prog_name:
                 scheduled_programs.append(ScheduledProgram(prog_name, prog_name))
@@ -2416,7 +2808,12 @@ class ControllerBuilder(L5xElementBuilder):
             _tag_object_id = result[1]
             tag = TagBuilder(self._cur, _tag_object_id).build()
             tag._data_types_map = data_types_map
-            if tag.data_type and not tag.name.startswith("$") and ":" not in tag.name and not tag.name.startswith("__"):
+            if (
+                (tag.data_type or tag.tag_type == "Alias")
+                and not tag.name.startswith("$")
+                and ":" not in tag.name
+                and not tag.name.startswith("__")
+            ):
                 tags.append(tag)
 
         # Get the Program Collection and get the programs
@@ -2442,13 +2839,13 @@ class ControllerBuilder(L5xElementBuilder):
                 ProgramBuilder(self._cur, _program_object_id, data_types_map, redundancy_enabled).build()
             )
 
-        # Build comment_id → program name map for task scheduled-program resolution.
-        # comment_id is a u16 at BLOB offset 0x0C in each program's RxGeneric record.
+        # Build task schedule ID → program name map. Legacy projects keep this
+        # ID in program attribute 0x01; newer records use the Rx comment ID.
         self._cur.execute(
             "SELECT comp_name, record FROM comps WHERE parent_id=" + str(_program_collection_object_id)
         )
         comment_id_to_program: Dict[int, str] = {
-            struct.unpack_from("<H", rec, 0x0C)[0]: pname
+            _program_schedule_id(bytes(rec)): pname
             for pname, rec in self._cur.fetchall()
         }
 
@@ -2510,7 +2907,7 @@ class ControllerBuilder(L5xElementBuilder):
             mod_rows = self._cur.fetchall()
 
             # First pass: build modid→name map so child modules can resolve their parent name.
-            from acd.generated.comps.rx_generic import RxGeneric as _RxG
+            from acd.record.rx import RxGeneric as _RxG
             modid_to_name: Dict[int, str] = {}
             for db_name, mod_oid, mod_rec in mod_rows:
                 display_name = "?" if (db_name.startswith("$") and db_name.endswith("$")) else db_name
