@@ -18,6 +18,7 @@
 #
 import subprocess
 import platform
+import shutil
 
 from setuptools import setup, find_packages
 from setuptools.command.install import install as _install
@@ -38,7 +39,13 @@ class install(_install):
             kaitai_compiler_executable = "kaitai-struct-compiler.bat"
         else:
             print("Linux or Mac Detected, using the ksc executable")
-            kaitai_compiler_executable = "ksc"       
+            kaitai_compiler_executable = "ksc"
+        compiler = shutil.which(kaitai_compiler_executable)
+        if compiler is None:
+            print("Kaitai compiler not found; using checked-in generated parsers")
+            _install.run(self)
+            return
+        kaitai_compiler_executable = compiler
         print("--------------------------------------------------------------------")
         print("Compiling Dat/Day.ksy")
         subprocess.run(
@@ -124,7 +131,7 @@ class install(_install):
 
 setup(
     name="acd-tools",
-    version="0.2a8",
+    version="0.2a9",
     description="Rockwell ACD File Tools",
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -132,7 +139,7 @@ setup(
         "Topic :: Scientific/Engineering :: Interface Engine/Protocol Translator",
     ],
     keywords="rockwell acd logix",
-    url="https://github.com/hutcheb/acd",
+    url="https://github.com/Atbash-Labs/acd-plc-serdes",
     author="Ben Hutcheson",
     author_email="",
     license="Apache 2.0",
