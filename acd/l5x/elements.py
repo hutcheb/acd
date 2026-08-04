@@ -43,6 +43,37 @@ class L5xElementBuilder:
     _object_id: int = -1
 
 
+def _get_program_records(cur: Cursor, collection_id: int) -> List[Tuple[str, int, int, bytes]]:
+    cur.execute(
+        "SELECT comp_name, object_id, record_type, record FROM comps "
+        "WHERE parent_id=? AND record_type=256",
+        (collection_id,),
+    )
+    return cur.fetchall()
+
+
+def _required_program_collection(
+    cur: Cursor,
+    program_name: str,
+    program_id: int,
+    record_type: int,
+    collection_name: str,
+) -> int:
+    cur.execute(
+        "SELECT object_id FROM comps WHERE parent_id=? AND comp_name=?",
+        (program_id, collection_name),
+    )
+    rows = cur.fetchall()
+    context = (
+        f"program {program_name!r} (object_id={program_id}, record_type={record_type})"
+    )
+    if not rows:
+        raise ValueError(f"{context} is missing required {collection_name}")
+    if len(rows) > 1:
+        raise ValueError(f"{context} has multiple {collection_name} children")
+    return rows[0][0]
+
+
 # Maps Python attribute names to L5X XML section wrapper tag names.
 # Entries here also control which list attributes are serialized as child sections.
 _LIST_SECTION_NAMES = {
@@ -2469,15 +2500,16 @@ class ProgramBuilder(L5xElementBuilder):
 
     def build(self) -> Program:
         self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
-            + str(self._object_id)
+            "SELECT comp_name, record_type, record FROM comps WHERE object_id=?",
+            (self._object_id,),
         )
-        results = self._cur.fetchall()
+        row = self._cur.fetchone()
+        if row is None:
+            raise ValueError(f"program object_id={self._object_id} was not found")
 
-        prog_record = bytes(results[0][3])
+        name, record_type, record = row
+        prog_record = bytes(record)
         r = RxGeneric.from_bytes(prog_record)
-
-        name = results[0][0]
 
         # --- MainRoutineName and FaultRoutineName from extended records ---
         # ext[0x12D] = MainRoutine object_id, ext[0x066] = FaultRoutine object_id
@@ -2507,13 +2539,13 @@ class ProgramBuilder(L5xElementBuilder):
         )
         disabled = "true" if disabled_flag else "false"
 
-        self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id="
-            + str(self._object_id)
-            + " AND comp_name='RxRoutineCollection'"
+        collection_id = _required_program_collection(
+            self._cur,
+            name,
+            self._object_id,
+            record_type,
+            "RxRoutineCollection",
         )
-        collection_results = self._cur.fetchall()
-        collection_id = collection_results[0][1]
 
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE parent_id="
@@ -2526,18 +2558,17 @@ class ProgramBuilder(L5xElementBuilder):
             routines.append(RoutineBuilder(self._cur, child[1]).build())
 
         # Get the Program Scoped Tags
-        self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
-            + str(self._object_id)
-            + " AND comp_name='RxTagCollection'"
+        tag_collection_id = _required_program_collection(
+            self._cur,
+            name,
+            self._object_id,
+            record_type,
+            "RxTagCollection",
         )
-        results = self._cur.fetchall()
-        if len(results) > 1:
-            raise Exception("Contains more than one program tag collection")
 
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
-            + str(results[0][1])
+            + str(tag_collection_id)
         )
         results = self._cur.fetchall()
         tags: List[Tag] = []
@@ -2827,13 +2858,9 @@ class ControllerBuilder(L5xElementBuilder):
             raise Exception("Contains more than one controller program collection")
 
         _program_collection_object_id = results[0][1]
-        self._cur.execute(
-            "SELECT comp_name, object_id, parent_id, record_type FROM comps WHERE parent_id="
-            + str(_program_collection_object_id)
-        )
-        results = self._cur.fetchall()
+        program_records = _get_program_records(self._cur, _program_collection_object_id)
         programs: List[Program] = []
-        for result in results:
+        for result in program_records:
             _program_object_id = result[1]
             programs.append(
                 ProgramBuilder(self._cur, _program_object_id, data_types_map, redundancy_enabled).build()
