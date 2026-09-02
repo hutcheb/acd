@@ -76,3 +76,25 @@ def test_builtin_table_invariants():
         for component in key:
             assert isinstance(component, int) and component >= 0, "key component must be a non-negative int: %r" % (key,)
         assert isinstance(value, str) and value.strip(), "value must be a non-empty string: %r -> %r" % (key, value)
+
+
+def test_is_cip_placeholder_recognises_the_fallback_not_real_catalogs():
+    # A3 finding (Studio v35): the controller ProcessorType must be a real
+    # Rockwell catalog number, never the CIP-triple placeholder. This helper is
+    # the predicate that keeps the placeholder out of ProcessorType while still
+    # allowing it in a module's CatalogNumber. Lock both sides.
+    from acd.l5x.elements import _is_cip_placeholder as is_ph
+    # The structured fallback forms are recognised:
+    assert is_ph("CIP-1-14-216") is True
+    assert is_ph("CIP-1-12-166") is True
+    assert is_ph("CIP-1182-43-4156") is True
+    # Real Rockwell catalog numbers are NOT placeholders (must stay usable as
+    # a ProcessorType):
+    assert is_ph("1756-L85E") is False
+    assert is_ph("1756-L82") is False
+    assert is_ph("1794-IP4/B") is False
+    assert is_ph("1756-EN2T") is False
+    # Edge cases: empty / non-matching strings are not placeholders:
+    assert is_ph("") is False
+    assert is_ph("CIP") is False  # no numbers
+    assert is_ph("CIP-1") is False  # needs at least two numeric segments

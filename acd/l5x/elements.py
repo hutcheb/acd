@@ -16,6 +16,22 @@ from acd.l5x.port_structures import PORT_STRUCTURES
 from acd.record.rx import LegacyRxGeneric, RxGeneric
 
 
+_CIP_PLACEHOLDER_RE = re.compile(r"^CIP-\d+(-\d+)+$")
+
+
+def _is_cip_placeholder(catalog_number: str) -> bool:
+    """True when catalog_number is the structured CIP-triple fallback string
+    (e.g. "CIP-1-14-216") rather than a real Rockwell catalog number.
+
+    Used to keep a CIP placeholder OUT of the controller ProcessorType (which
+    Studio must read as a real catalog number) while still allowing it in a
+    module's CatalogNumber (where Studio retains it harmlessly as a custom
+    number). The pattern matches the fallback format produced by
+    catalog_number_for_identity: "CIP-<vendor>-<product_type>-<product_code>".
+    """
+    return bool(catalog_number) and bool(_CIP_PLACEHOLDER_RE.match(catalog_number))
+
+
 # Characters that are illegal in XML 1.0: everything outside
 # #x9 | #xA | #xD | #x20-#xD7FF | #xE000-#xFFFD | #x10000-#x10FFFF.
 _XML_ILLEGAL_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
@@ -3003,9 +3019,27 @@ class ControllerBuilder(L5xElementBuilder):
 
         # ProcessorType is the CatalogNumber of the root controller module (the one
         # whose parent is itself, i.e. MajorFault="true").
-        processor_type = next(
+        #
+        # A3 finding (Studio 5000 v35 import): Studio reads ProcessorType to
+        # identify the CPU. A real part number (e.g. "1756-L85E") is fine, but our
+        # CIP-triple placeholder for an out-of-table CPU (e.g. "CIP-1-14-216") is
+        # NOT a catalog Studio recognises -- it then mis-guesses the controller type
+        # (observed: defaulted to 1756-L1 / ControlLogix 5550) and raises "The
+        # controller configured for this project is not supported in this revision
+        # of software." So when the CPU is out of the catalog, emit NO ProcessorType
+        # (None -> omitted from XML) rather than a CIP-... string. Studio will then
+        # prompt for the controller type instead of silently picking a wrong one.
+        # The module-level CatalogNumber keeps the CIP-... placeholder (that's
+        # harmless -- Studio retains it as a custom catalog number); only the
+        # controller ProcessorType must be a real catalog number or absent.
+        cpu_catalog = next(
             (m.catalog_number for m in modules if m.major_fault == "true" and m.catalog_number),
             None,
+        )
+        processor_type = (
+            None
+            if (cpu_catalog is None or _is_cip_placeholder(cpu_catalog))
+            else cpu_catalog
         )
 
         # MajorRev and MinorRev come from the firmware version of the Local (backplane
