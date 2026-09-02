@@ -1,6 +1,16 @@
 # Maps (vendor, product_type, product_code) → CatalogNumber string.
 # Built from Logix-exported L5X files; not stored in the ACD binary.
+import json
 from typing import Dict, Optional, Tuple
+
+
+class CatalogError(ValueError):
+    """Raised when an external catalog file is malformed.
+
+    A catalog that fails to validate is a data error the caller can fix, so it
+    is surfaced loudly (not swallowed) rather than silently producing wrong
+    catalog numbers.
+    """
 
 CATALOG_NUMBERS: Dict[Tuple[int, int, int], str] = {
     (1, 0, 18): "ETHERNET-MODULE",
@@ -45,6 +55,117 @@ CATALOG_NUMBERS: Dict[Tuple[int, int, int], str] = {
 }
 
 
+def _identity_key_from_any(raw: object) -> Optional[Tuple[int, int, int]]:
+    """Coerce a catalog key into an (int, int, int) identity, or None.
+
+    Accepts the two natural JSON shapes: a 3-element array/tuple
+    ``[vendor, product_type, product_code]`` or an object
+    ``{"vendor": v, "product_type": t, "product_code": c}``. Returns None
+    when the shape is unrecognised so the caller can raise a clear error.
+    """
+    if isinstance(raw, (list, tuple)) and len(raw) == 3:
+        try:
+            return (int(raw[0]), int(raw[1]), int(raw[2]))
+        except (TypeError, ValueError):
+            return None
+    if isinstance(raw, dict):
+        try:
+            return (
+                int(raw["vendor"]),
+                int(raw["product_type"]),
+                int(raw["product_code"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            return None
+    return None
+
+
+def load_external_catalog(path: str) -> Dict[Tuple[int, int, int], str]:
+    """Load and validate a JSON catalog of CIP identity → catalog number.
+
+    The file is a mapping from an identity triple to a catalog-number string.
+    Two key shapes are accepted (per entry, or as a single wrapper):
+      * array:  ``{"1:12:166": "1756-EN2T"}`` or ``{"entries": {"1:12:166": ...}}``
+      * object: ``{"1:12:166": "1756-EN2T"}`` where the key is
+                ``"vendor:product_type:product_code"`` (e.g. ``"1:12:166"``)
+
+    The colon-joined string form is chosen deliberately: identity triples are
+    stable, sortable, and unambiguous when written as ``v:t:c``. Every value
+    must be a non-empty string; every key must parse as three non-negative
+    integers. The result is a plain dict keyed by the (v, t, c) tuple, ready
+    to be passed to ``catalog_number_for_identity(table=...)`` or merged over
+    ``CATALOG_NUMBERS``.
+
+    This is the extension point for a shared, richer catalog (Rockwell's own
+    data, or the module templates aei-logix5000 extracts) so that adding a
+    part number is a data change, not a code change.
+    """
+    with open(path, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+
+    if not isinstance(data, dict):
+        raise CatalogError(f"external catalog root must be a JSON object: {path}")
+    if "entries" in data and isinstance(data.get("entries"), dict):
+        data = data["entries"]
+
+    out: Dict[Tuple[int, int, int], str] = {}
+    for key, value in data.items():
+        # Allow "_"-prefixed metadata keys (e.g. "_comment") for documentation
+        # inside the JSON; they are skipped, not validated, so a file can carry
+        # a human-readable note and still load.
+        if isinstance(key, str) and key.startswith("_"):
+            continue
+        identity = _identity_key_from_any(key)
+        if identity is None:
+            # Try the "v:t:c" string form.
+            identity = _parse_colon_key(key)
+        if identity is None:
+            raise CatalogError(
+                f"unrecognised catalog identity key {key!r} in {path}"
+            )
+        if not isinstance(value, str) or not value.strip():
+            raise CatalogError(
+                f"catalog value for identity {identity} must be a non-empty "
+                f"string in {path}"
+            )
+        v, t, c = identity
+        if v < 0 or t < 0 or c < 0:
+            raise CatalogError(f"identity {identity} has a negative component in {path}")
+        out[identity] = value.strip()
+    return out
+
+
+def _parse_colon_key(key: object) -> Optional[Tuple[int, int, int]]:
+    """Parse a ``"vendor:product_type:product_code"`` string key."""
+    if not isinstance(key, str):
+        return None
+    parts = key.split(":")
+    if len(parts) != 3:
+        return None
+    try:
+        return (int(parts[0]), int(parts[1]), int(parts[2]))
+    except ValueError:
+        return None
+
+
+def merge_catalog(
+    base: Optional[Dict[Tuple[int, int, int], str]] = None,
+    overrides: Optional[Dict[Tuple[int, int, int], str]] = None,
+) -> Dict[Tuple[int, int, int], str]:
+    """Return a new table = ``base`` with ``overrides`` applied on top.
+
+    ``base`` defaults to the built-in ``CATALOG_NUMBERS``. ``overrides``
+    (typically from ``load_external_catalog``) win on any conflicting
+    identity. Neither input is mutated.
+    """
+    base = CATALOG_NUMBERS if base is None else base
+    if not overrides:
+        return dict(base)
+    merged = dict(base)
+    merged.update(overrides)
+    return merged
+
+
 def _fallback_catalog_number(identity: Tuple[int, int, int]) -> str:
     """Derive a structured CatalogNumber for a CIP identity not in the table.
 
@@ -80,6 +201,17 @@ def catalog_number_for_identity(
       1. the ``table`` (default: the built-in ``CATALOG_NUMBERS``), or
       2. a caller-supplied ``fallback`` string, or
       3. a structured ``CIP-<vendor>-<type>-<code>`` placeholder.
+
+    To use a richer/shared catalog (Rockwell's own data, or the module
+    templates aei-logix5000 extracts), load it with
+    :func:`load_external_catalog`, combine it with :func:`merge_catalog`
+    (external entries win), and pass the result as ``table=``::
+
+        from acd.l5x.catalog_numbers import (
+            load_external_catalog, merge_catalog,
+        )
+        table = merge_catalog(None, load_external_catalog("shared_catalog.json"))
+        number = catalog_number_for_identity((1, 14, 216), table=table)
 
     A zero identity ``(0, 0, 0)`` means the module record did not carry a
     CIP identity at all (e.g. an unparseable record); for that case an empty
