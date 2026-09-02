@@ -49,11 +49,13 @@ def test_caller_table_overrides_builtin():
     assert catalog_number_for_identity((1, 99, 4242), table=custom) == "MY-MODULE"
 
 
-def test_explicit_fallback_string_used_for_unknown():
-    # A caller-supplied fallback is used before the CIP placeholder.
-    assert catalog_number_for_identity((1, 99, 4242), fallback="?") == "?"
-    # But a known identity still resolves from the table, not the fallback.
-    assert catalog_number_for_identity((1, 12, 166), fallback="?") == "1756-EN2T"
+def test_real_l82e_l81e_ids_resolve_natively():
+    # A3 finding: the real CIP identities (verified from genuine ACDs) must
+    # resolve to their real catalog numbers without an external catalog.
+    # These entries are a regression guard: if they are ever removed or
+    # mistyped, the native conversion breaks.
+    assert catalog_number_for_identity((1, 14, 165)) == "1756-L82E"
+    assert catalog_number_for_identity((1, 14, 164)) == "1756-L81E"
 
 
 def test_fallback_is_deterministic():

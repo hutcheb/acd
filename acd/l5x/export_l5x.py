@@ -6,12 +6,13 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from sqlite3 import Cursor
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 
 from acd.database.dbextract import DbExtract
 from acd.zip.unzip import Unzip
 from loguru import logger as log
 
+from acd.l5x.catalog_numbers import load_external_catalog
 from acd.l5x.elements import (
     Controller,
     ControllerBuilder,
@@ -276,6 +277,13 @@ if __name__ == "__main__":
         nargs="+",
         help="Filename of the exported file",
     )
+    parser.add_argument(
+        "--catalog",
+        metavar="JSON",
+        type=str,
+        default=None,
+        help="External catalog JSON path (merges over built-in CATALOG_NUMBERS)",
+    )
 
     args = parser.parse_args()
     # Build the in-memory project and write the L5X XML. (Previously this
@@ -284,6 +292,10 @@ if __name__ == "__main__":
     # never emitted the .L5X. This mirrors ConvertAcdToL5x.extract() in
     # acd.api: import the project, serialise via to_xml(), write the file.)
     export = ExportL5x(args.input[0])
+    # Thread external catalog through so out-of-table CPUs resolve to real
+    # part numbers (A3 fix). None -> built-in only.
+    if args.catalog:
+        export._catalog_table = load_external_catalog(args.catalog)
     project = export.project
     raw_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + project.to_xml()
     out_dir = os.path.dirname(args.output[0])

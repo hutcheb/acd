@@ -194,15 +194,12 @@ def _fallback_catalog_number(identity: Tuple[int, int, int]) -> str:
 def catalog_number_for_identity(
     identity: Tuple[int, int, int],
     table: Optional[Dict[Tuple[int, int, int], str]] = None,
-    *,
-    fallback: Optional[str] = None,
 ) -> str:
     """Resolve the CatalogNumber string for a CIP identity triple.
 
     Resolution order:
       1. the ``table`` (default: the built-in ``CATALOG_NUMBERS``), or
-      2. a caller-supplied ``fallback`` string, or
-      3. a structured ``CIP-<vendor>-<type>-<code>`` placeholder.
+      2. a structured ``CIP-<vendor>-<type>-<code>`` placeholder.
 
     To use a richer/shared catalog (Rockwell's own data, or the module
     templates aei-logix5000 extracts), load it with
@@ -231,6 +228,4 @@ def catalog_number_for_identity(
         return ""
     if identity in table:
         return table[identity]
-    if fallback is not None:
-        return fallback
     return _fallback_catalog_number(identity)
