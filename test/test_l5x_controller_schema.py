@@ -99,15 +99,20 @@ def test_root_cpu_module_has_ports():
 
 
 def test_l82e_cpu_has_ports():
-    # The L82E (CIP 1/14/92) was out of the port table -> empty <Ports/>. Now it
-    # must carry ICP + Ethernet like the other Ethernet CPUs.
+    # The REAL 1756-L82E CIP identity is 1/14/165 (verified from a genuine
+    # C1756L82E.ACD's QuickInfo: VendorID=1 ProductType=14 ProductCode=165). An
+    # earlier guess of 1/14/92 was wrong (92 is a generic/template CPU, not an
+    # L82E) and has been corrected. The L82E must carry ICP + Ethernet like the
+    # other Ethernet CPUs, so it gets a <Ports> section instead of <Ports/>.
     from acd.l5x.port_structures import PORT_STRUCTURES
 
-    assert (1, 14, 92) in PORT_STRUCTURES, "1756-L82E (1:14:92) missing from PORT_STRUCTURES"
-    defs = PORT_STRUCTURES[(1, 14, 92)]
+    assert (1, 14, 165) in PORT_STRUCTURES, "1756-L82E (1:14:165) missing from PORT_STRUCTURES"
+    defs = PORT_STRUCTURES[(1, 14, 165)]
     types = {d.port_type for d in defs}
     assert "ICP" in types, "L82E port structure must include an ICP port"
     assert "Ethernet" in types, "L82E port structure must include an Ethernet port"
+    # The bogus 1:14:92 must NOT be in the table (it was a mislabel, since fixed).
+    assert (1, 14, 92) not in PORT_STRUCTURES, "1:14:92 was a mislabel for the L82E; remove it"
 
 
 def test_generated_xml_is_well_formed():
