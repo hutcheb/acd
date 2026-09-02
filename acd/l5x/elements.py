@@ -11,7 +11,7 @@ from pathlib import Path
 from sqlite3 import Cursor
 from typing import List, Tuple, Dict, Union
 
-from acd.l5x.catalog_numbers import CATALOG_NUMBERS
+from acd.l5x.catalog_numbers import CATALOG_NUMBERS, catalog_number_for_identity
 from acd.l5x.port_structures import PORT_STRUCTURES
 from acd.record.rx import LegacyRxGeneric, RxGeneric
 
@@ -1577,7 +1577,7 @@ class ModuleBuilder(L5xElementBuilder):
         return Module(
             name,           # L5xElement._name (private)
             name,           # Module.name
-            CATALOG_NUMBERS.get((vendor, product_type, product_code), ""),
+            catalog_number_for_identity((vendor, product_type, product_code)),
             vendor,
             product_type,
             product_code,
