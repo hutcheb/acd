@@ -67,6 +67,14 @@ PORT_STRUCTURES: Dict[Tuple[int, int, int], List[PortDef]] = {
         PortDef(port_id=1, port_type="ICP",      upstream_fixed=True,  upstream_port=False, address_mode="slot",  bus_mode="fixed:17"),
         PortDef(port_id=2, port_type="Ethernet",  upstream_fixed=False, upstream_port=False, address_mode="omit",  bus_mode="always"),
     ],
+    (1, 14, 92): [  # 1756-L82E (ControlLogix 5580) -- root CPU, ICP + integrated Ethernet,
+        # same port structure as the L85E (Port 1 ICP downstream, Port 2 Ethernet).
+        # Added so an L82E CPU (out of the built-in catalog) still gets a <Ports>
+        # section instead of an empty <Ports/> (Studio: "Required property 'Port'
+        # was missing").
+        PortDef(port_id=1, port_type="ICP",      upstream_fixed=True,  upstream_port=False, address_mode="slot",  bus_mode="fixed:17"),
+        PortDef(port_id=2, port_type="Ethernet",  upstream_fixed=False, upstream_port=False, address_mode="omit",  bus_mode="always"),
+    ],
 
     # --- Older ControlLogix CPUs (no Ethernet port) PT=14 ---
     # 1756-L72, 1756-L73: only Port 1 ICP.

@@ -1046,30 +1046,55 @@ class Controller(L5xElement):
         }
 
     def to_xml(self) -> str:
+        # The <Controller> child element ORDER is fixed by the Studio 5000 schema
+        # (validated against the known-good reference files in resources/, e.g.
+        # ACDTestsWithAOI.L5X). It is:
+        #   Description, RedundancyInfo, Security, SafetyInfo, DataTypes, Modules,
+        #   AddOnInstructionDefinitions, Tags, Programs, Tasks, CST, WallClockTime,
+        #   Trends, DataLogs, TimeSynchronize, EthernetPorts
+        # NOTE: AddOnInstructionDefinitions comes right AFTER Modules (not after
+        # Tasks as the field-declaration order would suggest), and the structural
+        # stubs (RedundancyInfo/Security/SafetyInfo) come BEFORE the data sections.
+        # The base to_xml() emits children in dataclass field order, which is the
+        # WRONG order for Studio import, so we build the inner content explicitly.
         base = super().to_xml()
-        # Split at the end of the opening <Controller ...> tag so we can inject
-        # structural stubs before the data sections and post-sections after them.
         idx = base.index(">")
         open_tag = base[: idx + 1]
-        inner = base[idx + 1 : -len("</Controller>")]
-        # RedundancyInfo: Enabled comes from binary; no pad attributes in golden.
+
         redundancy_enabled_str = "true" if self._redundancy_enabled else "false"
-        redundancy_info = (
-            f'<RedundancyInfo Enabled="{redundancy_enabled_str}" KeepTestEditsOnSwitchOver="false"/>'
-        )
-        return (
-            open_tag
-            + inner
-            + redundancy_info
-            + '<Security Code="0" ChangesToDetect="16#ffff_ffff_ffff_ffff"/>'
-            + '<SafetyInfo/>'
-            + '<CST MasterID="0"/>'
-            + '<WallClockTime LocalTimeAdjustment="0" TimeZone="0"/>'
-            + '<Trends/>'
-            + '<DataLogs/>'
-            + '<TimeSynchronize Priority1="128" Priority2="128" PTPEnable="true"/>'
-            + '</Controller>'
-        )
+        # Reference files carry an empty <Description> stub as the first child.
+        parts = [
+            open_tag,
+            "<Description></Description>",
+            f'<RedundancyInfo Enabled="{redundancy_enabled_str}" KeepTestEditsOnSwitchOver="false"/>',
+            '<Security Code="0" ChangesToDetect="16#ffff_ffff_ffff_ffff"/>',
+            '<SafetyInfo/>',
+            self._section_xml("data_types", "DataTypes"),
+            self._section_xml("modules", "Modules"),
+            self._section_xml("aois", "AddOnInstructionDefinitions"),  # AFTER Modules
+            self._section_xml("tags", "Tags"),
+            self._section_xml("programs", "Programs"),
+            self._section_xml("tasks", "Tasks"),
+            '<CST MasterID="0"/>',
+            '<WallClockTime LocalTimeAdjustment="0" TimeZone="0"/>',
+            '<Trends/>',
+            '<DataLogs/>',
+            '<TimeSynchronize Priority1="128" Priority2="128" PTPEnable="true"/>',
+            # <EthernetPorts> is emitted by the project layer (see RSLogix5000Content);
+            # included here as a self-closing stub so the schema order is complete
+            # when the controller is serialised standalone.
+            '<EthernetPorts/>',
+            '</Controller>',
+        ]
+        return "".join(parts)
+
+    def _section_xml(self, field_name: str, tag_name: str) -> str:
+        """Serialize a list-of-L5xElement field as <Tag>...</Tag> (or <Tag/>)."""
+        items = getattr(self, field_name, None) or []
+        if not items:
+            return f"<{tag_name}/>"
+        inner = "".join(item.to_xml() for item in items)
+        return f"<{tag_name}>{inner}</{tag_name}>"
 
 
 @dataclass
