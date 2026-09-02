@@ -37,6 +37,38 @@ def _escape_xml_attr(value: object) -> str:
     return text.replace("\t", "&#x9;").replace("\r", "&#xD;").replace("\n", "&#xA;")
 
 
+# Characters that are illegal in Windows (and some other) filesystem names.
+# comp_name values are Logix tag/channel names and can legally contain
+# ":" (e.g. "CHANNEL_DI_TIMESTAMP:O:0"), "/" and "\" (member access), and
+# other characters that Windows refuses in a filename or directory name.
+_PATH_ILLEGAL_RE = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+
+
+def _sanitize_path_component(name: str) -> str:
+    """Make a Logix comp_name safe to use as a single path component.
+
+    ``DumpCompsRecords`` writes one file (and one sub-directory) per record,
+    naming them after ``comp_name``. Those names come straight from the ACD
+    binary and may contain characters that are illegal in filesystem paths on
+    some platforms -- most commonly ``:`` on Windows (a channel name such as
+    ``CHANNEL_DI_TIMESTAMP:O:0``). Without this, ``os.makedirs``/``open`` raise
+    OSError [WinError 123] on Windows.
+
+    Illegal characters are replaced with ``_`` (deterministic and lossless for
+    round-tripping to the directory layout, since the original name is still
+    recorded in output.log). Names that need no change pass through untouched,
+    so existing dumps on Linux/macOS are unaffected.
+    """
+    cleaned = _PATH_ILLEGAL_RE.sub("_", name)
+    # Windows also reserves device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9);
+    # a trailing space/dot can break open() there. Prefix such names defensively.
+    stem = cleaned.strip().split(".")[0].upper()
+    if stem in {"CON", "PRN", "AUX", "NUL"} or re.fullmatch(r"(COM|LPT)[1-9]", stem):
+        cleaned = "_" + cleaned
+    cleaned = cleaned.rstrip(" .")
+    return cleaned or "_"
+
+
 @dataclass
 class L5xElementBuilder:
     _cur: Cursor
@@ -3116,14 +3148,18 @@ class DumpCompsRecords(L5xElementBuilder):
             object_id = result[1]
             name = result[0]
             record = result[4]
-            new_path = Path(os.path.join(self.base_directory, name))
+            # comp_name may contain path-unsafe characters (e.g. ":" in channel
+            # names on Windows). Use a sanitized component for the on-disk path;
+            # keep the original name in the log so nothing is lost.
+            safe_name = _sanitize_path_component(name)
+            new_path = Path(os.path.join(self.base_directory, safe_name))
             if os.path.exists(os.path.join(new_path)):
                 shutil.rmtree(os.path.join(new_path))
             if not os.path.exists(os.path.join(new_path)):
                 os.makedirs(new_path)
-            with open(Path(os.path.join(new_path, name + ".dat")), "wb") as file:
+            with open(Path(os.path.join(new_path, safe_name + ".dat")), "wb") as file:
                 log_file.write(
-                    f"Class - {struct.unpack_from('<H', result[4], 0xA)[0]} Instance {struct.unpack_from('<H', result[4], 0xC)[0]}- {str(new_path) + '/' + name}\n"
+                    f"Class - {struct.unpack_from('<H', result[4], 0xA)[0]} Instance {struct.unpack_from('<H', result[4], 0xC)[0]}- {name}\n"
                 )
                 file.write(record)
 

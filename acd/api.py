@@ -251,11 +251,21 @@ class DumpCompsRecordsToFile(ExportProject):
 
     def extract(self):
         export = ExportL5x(self.filename)
+        # The README documents dumping to a fresh directory
+        # (DumpCompsRecordsToFile("My.ACD", "output/")). Ensure that directory
+        # exists before writing output.log into it; previously a non-existent
+        # output_directory raised FileNotFoundError.
+        os.makedirs(self.output_directory, exist_ok=True)
         with open(
             os.path.join(self.output_directory, "output.log"),
             "w",
         ) as log_file:
-            DumpCompsRecords(export._cur, 0).dump(log_file=log_file)
+            # Write the record tree into the same output_directory (previously
+            # it defaulted to "./dump", so output.log and the tree ended up in
+            # different places).
+            DumpCompsRecords(
+                export._cur, 0, base_directory=self.output_directory
+            ).dump(log_file=log_file)
 
 
 @dataclass

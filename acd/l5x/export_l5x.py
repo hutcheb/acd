@@ -2,7 +2,8 @@ import argparse
 import os
 import sqlite3
 import struct
-from dataclasses import dataclass
+import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
 from sqlite3 import Cursor
 from typing import Dict, List, Union
@@ -26,7 +27,14 @@ from acd.record.sbregion import SbRegionRecord
 @dataclass
 class ExportL5x:
     input_filename: os.PathLike
-    _temp_dir: str = "build"  # tempfile.mkdtemp()
+    # Default to a unique temp dir per ExportL5x instance. The original default
+    # was the shared relative dir "build", which made concurrent/parallel test
+    # runs collide on build/acd.db (Windows locks the SQLite file while a
+    # connection is open, so a second run's os.remove in __post_init__ fails).
+    # tempfile.mkdtemp() was the documented intent (see the original comment);
+    # each instance now gets its own dir so runs are isolated. Pass a specific
+    # dir (e.g. "build") to restore the old behaviour for manual inspection.
+    _temp_dir: str = field(default_factory=lambda: tempfile.mkdtemp(prefix="acd-build-"))
     _controller: Union[Controller, None] = None
     _project: Union[RSLogix5000Content, None] = None
 
