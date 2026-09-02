@@ -3020,26 +3020,24 @@ class ControllerBuilder(L5xElementBuilder):
         # ProcessorType is the CatalogNumber of the root controller module (the one
         # whose parent is itself, i.e. MajorFault="true").
         #
-        # A3 finding (Studio 5000 v35 import): Studio reads ProcessorType to
-        # identify the CPU. A real part number (e.g. "1756-L85E") is fine, but our
-        # CIP-triple placeholder for an out-of-table CPU (e.g. "CIP-1-14-216") is
-        # NOT a catalog Studio recognises -- it then mis-guesses the controller type
-        # (observed: defaulted to 1756-L1 / ControlLogix 5550) and raises "The
-        # controller configured for this project is not supported in this revision
-        # of software." So when the CPU is out of the catalog, emit NO ProcessorType
-        # (None -> omitted from XML) rather than a CIP-... string. Studio will then
-        # prompt for the controller type instead of silently picking a wrong one.
-        # The module-level CatalogNumber keeps the CIP-... placeholder (that's
-        # harmless -- Studio retains it as a custom catalog number); only the
-        # controller ProcessorType must be a real catalog number or absent.
-        cpu_catalog = next(
+        # A3 finding (Studio 5000 v35 import): Studio reads ProcessorType to identify
+        # the CPU. A real part number (e.g. "1756-L85E") imports cleanly. For an
+        # out-of-table CPU the value is the CIP-triple placeholder ("CIP-1-14-216"),
+        # which Studio does NOT recognise as a catalog, so it shows a "Change
+        # Controller Type" dialog (observed: defaulted to 1756-L1/5550) -- the user
+        # then picks the real CPU (e.g. 1756-L82E) and the import completes.
+        #
+        # We DELIBERATELY keep emitting the placeholder here (NOT omitting it):
+        # omitting ProcessorType makes Studio unable to create the project file at
+        # all ("Failed to create project file ... Couldn't be found", Error
+        # 716-80042001) -- a worse outcome than the prompt. The clean fix for an
+        # out-of-table CPU is to cover its identity in the external catalog (so
+        # catalog_number_for_identity resolves to a real number like "1756-L82");
+        # until then the placeholder degrades to a manual "Change Controller Type"
+        # step, which works.
+        processor_type = next(
             (m.catalog_number for m in modules if m.major_fault == "true" and m.catalog_number),
             None,
-        )
-        processor_type = (
-            None
-            if (cpu_catalog is None or _is_cip_placeholder(cpu_catalog))
-            else cpu_catalog
         )
 
         # MajorRev and MinorRev come from the firmware version of the Local (backplane
