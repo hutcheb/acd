@@ -1080,13 +1080,43 @@ class Controller(L5xElement):
             '<Trends/>',
             '<DataLogs/>',
             '<TimeSynchronize Priority1="128" Priority2="128" PTPEnable="true"/>',
-            # <EthernetPorts> is emitted by the project layer (see RSLogix5000Content);
-            # included here as a self-closing stub so the schema order is complete
-            # when the controller is serialised standalone.
-            '<EthernetPorts/>',
+            self._ethernet_ports_xml(),
             '</Controller>',
         ]
         return "".join(parts)
+
+    def _ethernet_ports_xml(self) -> str:
+        """Build the <EthernetPorts> section.
+
+        A root ControlLogix CPU with an integrated Ethernet port (L83E/L84E/L85E/
+        L82E/L86E etc.) requires an <EthernetPort> descriptor. Omitting it (an empty
+        <Ports/>) makes Studio 5000 rename+delete the CPU module on import ("Collision
+        ... renamed to Local1 / Deleting module"). The known-good reference files
+        (e.g. ACDTestsWithAOI.L5X) carry:
+            <EthernetPorts><EthernetPort Port="1" Label="1" PortEnabled="true"/></EthernetPorts>
+        Emit that descriptor when the root CPU has an Ethernet port; otherwise an
+        empty <EthernetPorts/> (a CPU without integrated Ethernet, e.g. L74, has none).
+        """
+        for mod in self.modules:
+            if mod.major_fault != "true":
+                continue  # not the root CPU
+            # The CPU's integrated Ethernet port is the one with an Ethernet port
+            # definition. Detect via the port structure table.
+            from acd.l5x.port_structures import PORT_STRUCTURES
+
+            defs = PORT_STRUCTURES.get((mod.vendor, mod.product_type, mod.product_code)) or []
+            eth_ports = [d for d in defs if d.port_type == "Ethernet"]
+            if not eth_ports:
+                return "<EthernetPorts/>"
+            # One descriptor per integrated Ethernet port (these CPUs have exactly one).
+            # Port="1" is the CPU's own (first) Ethernet port in the EthernetPorts
+            # context; Label mirrors it; PortEnabled=true (active by default).
+            inner = "".join(
+                f'<EthernetPort Port="{n}" Label="{n}" PortEnabled="true"/>'
+                for n in range(1, len(eth_ports) + 1)
+            )
+            return f"<EthernetPorts>{inner}</EthernetPorts>"
+        return "<EthernetPorts/>"
 
     def _section_xml(self, field_name: str, tag_name: str) -> str:
         """Serialize a list-of-L5xElement field as <Tag>...</Tag> (or <Tag/>)."""
