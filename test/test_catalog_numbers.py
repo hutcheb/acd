@@ -70,12 +70,17 @@ def test_builtin_table_invariants():
     # the table is the documented size. (Note: two distinct triples may share
     # a catalog value -- e.g. firmware variants of the same device -- which is
     # legitimate and NOT flagged here.)
-    assert len(CATALOG_NUMBERS) == 39, "built-in table size changed: %d" % len(CATALOG_NUMBERS)
+    assert len(CATALOG_NUMBERS) == 41, "built-in table size changed: %d" % len(CATALOG_NUMBERS)
     for key, value in CATALOG_NUMBERS.items():
         assert isinstance(key, tuple) and len(key) == 3, "key must be a 3-tuple: %r" % (key,)
         for component in key:
             assert isinstance(component, int) and component >= 0, "key component must be a non-negative int: %r" % (key,)
         assert isinstance(value, str) and value.strip(), "value must be a non-empty string: %r -> %r" % (key, value)
+    # The real 1756-L82E / 1756-L81E CIP identities (verified from genuine ACD
+    # QuickInfo.DeviceIdentity) are now in the built-in table, so they resolve
+    # natively without an external catalog.
+    assert CATALOG_NUMBERS.get((1, 14, 165)) == "1756-L82E", "real L82E identity missing"
+    assert CATALOG_NUMBERS.get((1, 14, 164)) == "1756-L81E", "real L81E identity missing"
 
 
 def test_is_cip_placeholder_recognises_the_fallback_not_real_catalogs():
