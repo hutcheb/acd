@@ -317,12 +317,17 @@ class ConvertAcdToL5x(Extract):
 
     :param PathLike acd_filename: Path to the source .ACD file.
     :param PathLike l5x_filename: Path for the output .L5X file.
-    :param bool pretty_print: Pretty-print the XML output (default True).
+    :param bool pretty_print: Pretty-print the XML output (default False).
+        Default is False because the raw to_xml() format is what Studio 5000
+        expects: minidom.toprettyxml inserts blank lines between <Port> elements
+        inside <Ports>, which Studio's strict L5X parser rejects with "Required
+        property 'Port' was missing". The known-good reference files (resources/)
+        are not pretty-printed. Set pretty_print=True only for human reading.
     """
 
     acd_filename: PathLike
     l5x_filename: PathLike
-    pretty_print: bool = True
+    pretty_print: bool = False
     # Optional external catalog (JSON path or dict); merged over the built-in
     # table so out-of-table CPUs/modules resolve to real part numbers. None ->
     # built-in only (default, unchanged). See _resolve_catalog_table.
