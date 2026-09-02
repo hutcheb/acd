@@ -60,3 +60,19 @@ def test_fallback_is_deterministic():
     # Same identity, same string -- the placeholder is stable across runs so
     # an L5X diff is meaningful when only a table entry is added.
     assert catalog_number_for_identity((1, 99, 4242)) == catalog_number_for_identity((1, 99, 4242))
+
+
+def test_builtin_table_invariants():
+    # Regression guard on the built-in CATALOG_NUMBERS: lock its shape so a
+    # future edit that accidentally drops, corrupts, or mis-types an entry is
+    # caught. This tests what the table IS (honest, not a guess) -- every key
+    # is a 3-tuple of non-negative ints, every value a non-empty string, and
+    # the table is the documented size. (Note: two distinct triples may share
+    # a catalog value -- e.g. firmware variants of the same device -- which is
+    # legitimate and NOT flagged here.)
+    assert len(CATALOG_NUMBERS) == 39, "built-in table size changed: %d" % len(CATALOG_NUMBERS)
+    for key, value in CATALOG_NUMBERS.items():
+        assert isinstance(key, tuple) and len(key) == 3, "key must be a 3-tuple: %r" % (key,)
+        for component in key:
+            assert isinstance(component, int) and component >= 0, "key component must be a non-negative int: %r" % (key,)
+        assert isinstance(value, str) and value.strip(), "value must be a non-empty string: %r -> %r" % (key, value)
