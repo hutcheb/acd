@@ -269,4 +269,17 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    ExportL5x(args.input[0], args.output[0])
+    # Build the in-memory project and write the L5X XML. (Previously this
+    # passed the output path as ExportL5x's SECOND POSITIONAL arg, which landed
+    # in the _temp_dir field and wrote nothing -- the CLI built the SQLite DB but
+    # never emitted the .L5X. This mirrors ConvertAcdToL5x.extract() in
+    # acd.api: import the project, serialise via to_xml(), write the file.)
+    export = ExportL5x(args.input[0])
+    project = export.project
+    raw_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + project.to_xml()
+    out_dir = os.path.dirname(args.output[0])
+    if out_dir and not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
+    with open(args.output[0], "w", encoding="utf-8") as f:
+        f.write(raw_xml)
+    log.info("Wrote L5X: " + args.output[0])
