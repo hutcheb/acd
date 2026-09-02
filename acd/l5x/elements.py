@@ -1350,6 +1350,8 @@ class DataTypeBuilder(L5xElementBuilder):
 class ModuleBuilder(L5xElementBuilder):
     # Map from modid (u32) → module name, built by ControllerBuilder and passed in.
     _modid_to_name: Dict[int, str] = field(default_factory=dict)
+    # Optional richer CIP-identity -> catalog-number table (None -> built-in only).
+    _catalog_table: Union[Dict[Tuple[int, int, int], str], None] = None
 
     def _ip_from_data_collection(self, icp_slot: int) -> str:
         """Look up the Ethernet IP for a local backplane module via RxDataCollection.
@@ -1625,7 +1627,9 @@ class ModuleBuilder(L5xElementBuilder):
         return Module(
             name,           # L5xElement._name (private)
             name,           # Module.name
-            catalog_number_for_identity((vendor, product_type, product_code)),
+            catalog_number_for_identity(
+                (vendor, product_type, product_code), table=self._catalog_table
+            ),
             vendor,
             product_type,
             product_code,
@@ -2738,6 +2742,10 @@ class TaskBuilder(L5xElementBuilder):
 
 @dataclass
 class ControllerBuilder(L5xElementBuilder):
+    # Optional richer CIP-identity -> catalog-number table for resolving module
+    # CatalogNumbers and the controller ProcessorType. None -> built-in only.
+    _catalog_table: Union[Dict[Tuple[int, int, int], str], None] = None
+
     def build(self) -> Controller:
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record_type, record FROM comps WHERE parent_id=0 AND record_type=256"
@@ -3001,7 +3009,10 @@ class ControllerBuilder(L5xElementBuilder):
             modules = []
             for _, mod_oid, _ in mod_rows:
                 modules.append(
-                    ModuleBuilder(self._cur, mod_oid, modid_to_name).build()
+                    ModuleBuilder(
+                        self._cur, mod_oid, modid_to_name,
+                        _catalog_table=self._catalog_table,
+                    ).build()
                 )
 
             # Third pass: compute (parent_name, parent_port_id) → child count,
@@ -3035,6 +3046,12 @@ class ControllerBuilder(L5xElementBuilder):
         # catalog_number_for_identity resolves to a real number like "1756-L82");
         # until then the placeholder degrades to a manual "Change Controller Type"
         # step, which works.
+        # NOTE: the ProcessorType is derived from the CPU module's catalog_number
+        # (resolved above via ModuleBuilder with self._catalog_table), so a richer
+        # catalog (e.g. an external catalog merged over the built-in) flows through
+        # here automatically: an out-of-table CPU that IS in the external catalog
+        # gets a real ProcessorType (clean Studio import); one that is NOT still
+        # gets the CIP-... placeholder (the manual "Change Controller Type" case).
         processor_type = next(
             (m.catalog_number for m in modules if m.major_fault == "true" and m.catalog_number),
             None,

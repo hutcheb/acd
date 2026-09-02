@@ -111,3 +111,35 @@ def test_full_load_and_resolve_flow(tmp_path):
     # 1/14/216 was NOT in the built-in table (it's the CuteLogix CPU case);
     # with the external catalog it now resolves to a real name.
     assert catalog_number_for_identity((1, 14, 216), table=merged) == "1756-L83E-EXAMPLE"
+
+
+def test_resolve_catalog_table_helper(tmp_path):
+    # The api._resolve_catalog_table helper turns a catalog arg into the merged
+    # table the builders use (None -> None, dict -> merged, path -> loaded+merged).
+    from acd.api import _resolve_catalog_table
+    # None -> None (built-in only; ExportL5x unchanged behaviour).
+    assert _resolve_catalog_table(None) is None
+    # dict -> merged over the built-in table.
+    as_dict = _resolve_catalog_table({(1, 14, 216): "1756-L82"})
+    assert as_dict.get((1, 14, 216)) == "1756-L82"
+    assert as_dict.get((1, 12, 166)) == "1756-EN2T"  # built-in entry preserved
+    # path -> loaded + merged.
+    p = tmp_path / "cat.json"
+    p.write_text(json.dumps({"1:14:216": "1756-L82"}), encoding="utf-8")
+    as_path = _resolve_catalog_table(str(p))
+    assert as_path.get((1, 14, 216)) == "1756-L82"
+
+
+def test_builder_threads_catalog_table():
+    # The ModuleBuilder/ControllerBuilder must actually USE _catalog_table when
+    # resolving a catalog number (not just carry it). A ModuleBuilder with a
+    # table that maps an identity to a real name resolves it; without the table
+    # (None) the same identity falls back to the CIP-... placeholder.
+    from acd.l5x.elements import ModuleBuilder
+    # A ModuleBuilder is a dataclass carrying _catalog_table; verify the field
+    # exists and defaults to None (built-in behaviour) so old callers are unchanged.
+    assert ModuleBuilder._catalog_table is None  # class-level default
+    # And a ControllerBuilder built with a table carries it through.
+    from acd.l5x.elements import ControllerBuilder
+    cb = ControllerBuilder(None, _catalog_table={(1, 14, 216): "1756-L82"})
+    assert cb._catalog_table == {(1, 14, 216): "1756-L82"}

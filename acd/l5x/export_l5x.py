@@ -37,6 +37,13 @@ class ExportL5x:
     _temp_dir: str = field(default_factory=lambda: tempfile.mkdtemp(prefix="acd-build-"))
     _controller: Union[Controller, None] = None
     _project: Union[RSLogix5000Content, None] = None
+    # Optional richer catalog (CIP identity -> catalog number) used to resolve
+    # module CatalogNumbers and the controller ProcessorType. None (the default)
+    # means use the built-in CATALOG_NUMBERS only. A merged table (built-in with
+    # an external catalog on top, via catalog_numbers.merge_catalog) lets an
+    # out-of-table CPU resolve to a real part number so the L5X imports cleanly
+    # in Studio 5000 (the A3 finding). See acd/l5x/catalog_numbers.py.
+    _catalog_table: Union[Dict[Tuple[int, int, int], str], None] = None
 
     def __post_init__(self):
         log.info(
@@ -160,7 +167,9 @@ class ExportL5x:
     @property
     def controller(self):
         if self._controller is None:
-            self._controller = ControllerBuilder(self._cur).build()
+            self._controller = ControllerBuilder(
+                self._cur, _catalog_table=self._catalog_table
+            ).build()
         return self._controller
 
     @property
