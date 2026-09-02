@@ -16,22 +16,6 @@ from acd.l5x.port_structures import PORT_STRUCTURES
 from acd.record.rx import LegacyRxGeneric, RxGeneric
 
 
-_CIP_PLACEHOLDER_RE = re.compile(r"^CIP-\d+(-\d+)+$")
-
-
-def _is_cip_placeholder(catalog_number: str) -> bool:
-    """True when catalog_number is the structured CIP-triple fallback string
-    (e.g. "CIP-1-14-216") rather than a real Rockwell catalog number.
-
-    Used to keep a CIP placeholder OUT of the controller ProcessorType (which
-    Studio must read as a real catalog number) while still allowing it in a
-    module's CatalogNumber (where Studio retains it harmlessly as a custom
-    number). The pattern matches the fallback format produced by
-    catalog_number_for_identity: "CIP-<vendor>-<product_type>-<product_code>".
-    """
-    return bool(catalog_number) and bool(_CIP_PLACEHOLDER_RE.match(catalog_number))
-
-
 # Characters that are illegal in XML 1.0: everything outside
 # #x9 | #xA | #xD | #x20-#xD7FF | #xE000-#xFFFD | #x10000-#x10FFFF.
 _XML_ILLEGAL_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
