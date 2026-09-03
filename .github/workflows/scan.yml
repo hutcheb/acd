@@ -1,0 +1,29 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Security Scan
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+        python-version: [ '3.14' ]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis  
+    - name: SonarQube Scan
+      uses: SonarSource/sonarqube-scan-action@v8.2.1
+      env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}    
