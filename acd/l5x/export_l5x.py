@@ -2,15 +2,17 @@ import argparse
 import os
 import sqlite3
 import struct
-from dataclasses import dataclass
+import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
 from sqlite3 import Cursor
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 
 from acd.database.dbextract import DbExtract
 from acd.zip.unzip import Unzip
 from loguru import logger as log
 
+from acd.l5x.catalog_numbers import load_external_catalog
 from acd.l5x.elements import (
     Controller,
     ControllerBuilder,
@@ -26,9 +28,23 @@ from acd.record.sbregion import SbRegionRecord
 @dataclass
 class ExportL5x:
     input_filename: os.PathLike
-    _temp_dir: str = "build"  # tempfile.mkdtemp()
+    # Default to a unique temp dir per ExportL5x instance. The original default
+    # was the shared relative dir "build", which made concurrent/parallel test
+    # runs collide on build/acd.db (Windows locks the SQLite file while a
+    # connection is open, so a second run's os.remove in __post_init__ fails).
+    # tempfile.mkdtemp() was the documented intent (see the original comment);
+    # each instance now gets its own dir so runs are isolated. Pass a specific
+    # dir (e.g. "build") to restore the old behaviour for manual inspection.
+    _temp_dir: str = field(default_factory=lambda: tempfile.mkdtemp(prefix="acd-build-"))
     _controller: Union[Controller, None] = None
     _project: Union[RSLogix5000Content, None] = None
+    # Optional richer catalog (CIP identity -> catalog number) used to resolve
+    # module CatalogNumbers and the controller ProcessorType. None (the default)
+    # means use the built-in CATALOG_NUMBERS only. A merged table (built-in with
+    # an external catalog on top, via catalog_numbers.merge_catalog) lets an
+    # out-of-table CPU resolve to a real part number so the L5X imports cleanly
+    # in Studio 5000 (the A3 finding). See acd/l5x/catalog_numbers.py.
+    _catalog_table: Union[Dict[Tuple[int, int, int], str], None] = None
 
     def __post_init__(self):
         log.info(
@@ -152,7 +168,9 @@ class ExportL5x:
     @property
     def controller(self):
         if self._controller is None:
-            self._controller = ControllerBuilder(self._cur).build()
+            self._controller = ControllerBuilder(
+                self._cur, _catalog_table=self._catalog_table
+            ).build()
         return self._controller
 
     @property
@@ -259,6 +277,30 @@ if __name__ == "__main__":
         nargs="+",
         help="Filename of the exported file",
     )
+    parser.add_argument(
+        "--catalog",
+        metavar="JSON",
+        type=str,
+        default=None,
+        help="External catalog JSON path (merges over built-in CATALOG_NUMBERS)",
+    )
 
     args = parser.parse_args()
-    ExportL5x(args.input[0], args.output[0])
+    # Build the in-memory project and write the L5X XML. (Previously this
+    # passed the output path as ExportL5x's SECOND POSITIONAL arg, which landed
+    # in the _temp_dir field and wrote nothing -- the CLI built the SQLite DB but
+    # never emitted the .L5X. This mirrors ConvertAcdToL5x.extract() in
+    # acd.api: import the project, serialise via to_xml(), write the file.)
+    export = ExportL5x(args.input[0])
+    # Thread external catalog through so out-of-table CPUs resolve to real
+    # part numbers (A3 fix). None -> built-in only.
+    if args.catalog:
+        export._catalog_table = load_external_catalog(args.catalog)
+    project = export.project
+    raw_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + project.to_xml()
+    out_dir = os.path.dirname(args.output[0])
+    if out_dir and not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
+    with open(args.output[0], "w", encoding="utf-8") as f:
+        f.write(raw_xml)
+    log.info("Wrote L5X: " + args.output[0])

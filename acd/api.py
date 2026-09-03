@@ -6,7 +6,13 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
+from typing import Dict, Tuple, Union
 
+from acd.l5x.catalog_numbers import (
+    CATALOG_NUMBERS,
+    load_external_catalog,
+    merge_catalog,
+)
 from acd.integrity import (
     FILEINFO_LENGTH,
     compute_fileinfo,
@@ -24,15 +30,39 @@ from acd.database.acd_database import AcdDatabase
 from acd.l5x.elements import DumpCompsRecords, RSLogix5000Content
 
 
+def _resolve_catalog_table(catalog_file: Union[PathLike, Dict[Tuple[int, int, int], str], None]):
+    """Resolve a catalog argument into a merged CIP-identity -> catalog table.
+
+    - None -> None (ExportL5x uses the built-in CATALOG_NUMBERS; unchanged).
+    - a dict -> used as the override (merged over the built-in table).
+    - a path -> load_external_catalog(path), then merge over the built-in table.
+
+    The merged table is what the builders pass to catalog_number_for_identity,
+    so an out-of-table identity that IS in the external catalog resolves to a
+    real part number (clean Studio import); one that is NOT still falls back to
+    the CIP-... placeholder. This is the A3 fix made data-driven.
+    """
+    if catalog_file is None:
+        return None
+    if isinstance(catalog_file, dict):
+        external = catalog_file
+    else:
+        external = load_external_catalog(str(catalog_file))
+    return merge_catalog(CATALOG_NUMBERS, external)
+
+
 # Clean top-level API
 
-def load_acd(path, temp_dir: str = None) -> RSLogix5000Content:
+def load_acd(path, temp_dir: str = None, catalog_file=None) -> RSLogix5000Content:
     """Load an ACD file into a Python object model.
 
     Args:
         path: Path to the .ACD file.
         temp_dir: Directory for SQLite and extracted files.  A temporary
             directory is created and cleaned up automatically if omitted.
+        catalog_file: Optional external catalog (JSON path or dict) merged over
+            the built-in table so out-of-table CPUs/modules resolve to real part
+            numbers. None -> built-in only (default, unchanged).
 
     Returns:
         RSLogix5000Content with a fully populated controller object tree.
@@ -43,7 +73,7 @@ def load_acd(path, temp_dir: str = None) -> RSLogix5000Content:
     if cleanup:
         temp_dir = tempfile.mkdtemp(prefix="acd_load_")
     try:
-        exporter = ExportL5x(str(path), temp_dir)
+        exporter = ExportL5x(str(path), temp_dir, _catalog_table=_resolve_catalog_table(catalog_file))
         return exporter.project
     finally:
         if cleanup:
@@ -161,10 +191,16 @@ class ImportProjectFromFile(ImportProject):
     """Import a Controller from an ACD stored on file"""
 
     filename: PathLike
+    # Optional external catalog (a CIP-identity -> catalog-number JSON file, OR an
+    # already-loaded dict). When given, it is merged over the built-in table so an
+    # out-of-table CPU/module resolves to a real part number (clean Studio import).
+    # None -> built-in table only (default, unchanged behaviour).
+    catalog_file: Union[PathLike, dict, None] = None
 
     def import_project(self) -> RSLogix5000Content:
         # Import Project Interface
-        export = ExportL5x(self.filename)
+        table = _resolve_catalog_table(self.catalog_file)
+        export = ExportL5x(self.filename, _catalog_table=table)
         return export.project
 
 
@@ -251,11 +287,21 @@ class DumpCompsRecordsToFile(ExportProject):
 
     def extract(self):
         export = ExportL5x(self.filename)
+        # The README documents dumping to a fresh directory
+        # (DumpCompsRecordsToFile("My.ACD", "output/")). Ensure that directory
+        # exists before writing output.log into it; previously a non-existent
+        # output_directory raised FileNotFoundError.
+        os.makedirs(self.output_directory, exist_ok=True)
         with open(
             os.path.join(self.output_directory, "output.log"),
             "w",
         ) as log_file:
-            DumpCompsRecords(export._cur, 0).dump(log_file=log_file)
+            # Write the record tree into the same output_directory (previously
+            # it defaulted to "./dump", so output.log and the tree ended up in
+            # different places).
+            DumpCompsRecords(
+                export._cur, 0, base_directory=self.output_directory
+            ).dump(log_file=log_file)
 
 
 @dataclass
@@ -271,15 +317,26 @@ class ConvertAcdToL5x(Extract):
 
     :param PathLike acd_filename: Path to the source .ACD file.
     :param PathLike l5x_filename: Path for the output .L5X file.
-    :param bool pretty_print: Pretty-print the XML output (default True).
+    :param bool pretty_print: Pretty-print the XML output (default False).
+        Default is False because the raw to_xml() format is what Studio 5000
+        expects: minidom.toprettyxml inserts blank lines between <Port> elements
+        inside <Ports>, which Studio's strict L5X parser rejects with "Required
+        property 'Port' was missing". The known-good reference files (resources/)
+        are not pretty-printed. Set pretty_print=True only for human reading.
     """
 
     acd_filename: PathLike
     l5x_filename: PathLike
-    pretty_print: bool = True
+    pretty_print: bool = False
+    # Optional external catalog (JSON path or dict); merged over the built-in
+    # table so out-of-table CPUs/modules resolve to real part numbers. None ->
+    # built-in only (default, unchanged). See _resolve_catalog_table.
+    catalog_file: Union[PathLike, Dict[Tuple[int, int, int], str], None] = None
 
     def extract(self):
-        project = ImportProjectFromFile(self.acd_filename).import_project()
+        project = ImportProjectFromFile(
+            self.acd_filename, catalog_file=self.catalog_file
+        ).import_project()
         raw_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + project.to_xml()
         if self.pretty_print:
             try:

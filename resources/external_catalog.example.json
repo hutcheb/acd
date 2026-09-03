@@ -1,0 +1,5 @@
+{
+  "_comment": "Example external catalog for acd-tools. This is the extension point for a shared, richer CIP-identity -> catalog-number mapping. Load it with acd.l5x.catalog_numbers.load_external_catalog(path) and combine via merge_catalog(None, load_external_catalog(path)). Keys are 'vendor:product_type:product_code'. Entries here OVERRIDE the built-in CATALOG_NUMBERS where they conflict; identities not present fall back to CIP-<vendor>-<type>-<code>. The two entries below are taken verbatim from the bundled L5X samples (ACDTestsWithAOI.L5X); add more from Rockwell's catalog or aei-logix5000's module templates. No value may be empty; every key must be three non-negative integers.",
+  "1:12:166": "1756-EN2T",
+  "1:14:168": "1756-L85E"
+}

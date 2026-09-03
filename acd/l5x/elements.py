@@ -11,7 +11,7 @@ from pathlib import Path
 from sqlite3 import Cursor
 from typing import List, Tuple, Dict, Union
 
-from acd.l5x.catalog_numbers import CATALOG_NUMBERS
+from acd.l5x.catalog_numbers import CATALOG_NUMBERS, catalog_number_for_identity
 from acd.l5x.port_structures import PORT_STRUCTURES
 from acd.record.rx import LegacyRxGeneric, RxGeneric
 
@@ -35,6 +35,38 @@ def _escape_xml_attr(value: object) -> str:
     text = _XML_ILLEGAL_RE.sub("", str(value))
     text = html.escape(text, quote=True)
     return text.replace("\t", "&#x9;").replace("\r", "&#xD;").replace("\n", "&#xA;")
+
+
+# Characters that are illegal in Windows (and some other) filesystem names.
+# comp_name values are Logix tag/channel names and can legally contain
+# ":" (e.g. "CHANNEL_DI_TIMESTAMP:O:0"), "/" and "\" (member access), and
+# other characters that Windows refuses in a filename or directory name.
+_PATH_ILLEGAL_RE = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+
+
+def _sanitize_path_component(name: str) -> str:
+    """Make a Logix comp_name safe to use as a single path component.
+
+    ``DumpCompsRecords`` writes one file (and one sub-directory) per record,
+    naming them after ``comp_name``. Those names come straight from the ACD
+    binary and may contain characters that are illegal in filesystem paths on
+    some platforms -- most commonly ``:`` on Windows (a channel name such as
+    ``CHANNEL_DI_TIMESTAMP:O:0``). Without this, ``os.makedirs``/``open`` raise
+    OSError [WinError 123] on Windows.
+
+    Illegal characters are replaced with ``_`` (deterministic and lossless for
+    round-tripping to the directory layout, since the original name is still
+    recorded in output.log). Names that need no change pass through untouched,
+    so existing dumps on Linux/macOS are unaffected.
+    """
+    cleaned = _PATH_ILLEGAL_RE.sub("_", name)
+    # Windows also reserves device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9);
+    # a trailing space/dot can break open() there. Prefix such names defensively.
+    stem = cleaned.strip().split(".")[0].upper()
+    if stem in {"CON", "PRN", "AUX", "NUL"} or re.fullmatch(r"(COM|LPT)[1-9]", stem):
+        cleaned = "_" + cleaned
+    cleaned = cleaned.rstrip(" .")
+    return cleaned or "_"
 
 
 @dataclass
@@ -998,30 +1030,85 @@ class Controller(L5xElement):
         }
 
     def to_xml(self) -> str:
+        # The <Controller> child element ORDER is fixed by the Studio 5000 schema
+        # (validated against the known-good reference files in resources/, e.g.
+        # ACDTestsWithAOI.L5X). It is:
+        #   Description, RedundancyInfo, Security, SafetyInfo, DataTypes, Modules,
+        #   AddOnInstructionDefinitions, Tags, Programs, Tasks, CST, WallClockTime,
+        #   Trends, DataLogs, TimeSynchronize, EthernetPorts
+        # NOTE: AddOnInstructionDefinitions comes right AFTER Modules (not after
+        # Tasks as the field-declaration order would suggest), and the structural
+        # stubs (RedundancyInfo/Security/SafetyInfo) come BEFORE the data sections.
+        # The base to_xml() emits children in dataclass field order, which is the
+        # WRONG order for Studio import, so we build the inner content explicitly.
         base = super().to_xml()
-        # Split at the end of the opening <Controller ...> tag so we can inject
-        # structural stubs before the data sections and post-sections after them.
         idx = base.index(">")
         open_tag = base[: idx + 1]
-        inner = base[idx + 1 : -len("</Controller>")]
-        # RedundancyInfo: Enabled comes from binary; no pad attributes in golden.
+
         redundancy_enabled_str = "true" if self._redundancy_enabled else "false"
-        redundancy_info = (
-            f'<RedundancyInfo Enabled="{redundancy_enabled_str}" KeepTestEditsOnSwitchOver="false"/>'
-        )
-        return (
-            open_tag
-            + inner
-            + redundancy_info
-            + '<Security Code="0" ChangesToDetect="16#ffff_ffff_ffff_ffff"/>'
-            + '<SafetyInfo/>'
-            + '<CST MasterID="0"/>'
-            + '<WallClockTime LocalTimeAdjustment="0" TimeZone="0"/>'
-            + '<Trends/>'
-            + '<DataLogs/>'
-            + '<TimeSynchronize Priority1="128" Priority2="128" PTPEnable="true"/>'
-            + '</Controller>'
-        )
+        # Reference files carry an empty <Description> stub as the first child.
+        parts = [
+            open_tag,
+            "<Description></Description>",
+            f'<RedundancyInfo Enabled="{redundancy_enabled_str}" KeepTestEditsOnSwitchOver="false"/>',
+            '<Security Code="0" ChangesToDetect="16#ffff_ffff_ffff_ffff"/>',
+            '<SafetyInfo/>',
+            self._section_xml("data_types", "DataTypes"),
+            self._section_xml("modules", "Modules"),
+            self._section_xml("aois", "AddOnInstructionDefinitions"),  # AFTER Modules
+            self._section_xml("tags", "Tags"),
+            self._section_xml("programs", "Programs"),
+            self._section_xml("tasks", "Tasks"),
+            '<CST MasterID="0"/>',
+            '<WallClockTime LocalTimeAdjustment="0" TimeZone="0"/>',
+            '<Trends/>',
+            '<DataLogs/>',
+            '<TimeSynchronize Priority1="128" Priority2="128" PTPEnable="true"/>',
+            self._ethernet_ports_xml(),
+            '</Controller>',
+        ]
+        return "".join(parts)
+
+    def _ethernet_ports_xml(self) -> str:
+        """Build the <EthernetPorts> section.
+
+        A root ControlLogix CPU with an integrated Ethernet port (L83E/L84E/L85E/
+        L82E/L86E etc.) requires an <EthernetPort> descriptor. Omitting it (an empty
+        <Ports/>) makes Studio 5000 rename+delete the CPU module on import ("Collision
+        ... renamed to Local1 / Deleting module"). The known-good reference files
+        (e.g. ACDTestsWithAOI.L5X) carry:
+            <EthernetPorts><EthernetPort Port="1" Label="1" PortEnabled="true"/></EthernetPorts>
+        Emit that descriptor when the root CPU has an Ethernet port; otherwise an
+        empty <EthernetPorts/> (a CPU without integrated Ethernet, e.g. L74, has none).
+        """
+        for mod in self.modules:
+            if mod.major_fault != "true":
+                continue  # not the root CPU
+            # The CPU's integrated Ethernet port is the one with an Ethernet port
+            # definition. Detect via the port structure table.
+            from acd.l5x.port_structures import PORT_STRUCTURES
+
+            defs = PORT_STRUCTURES.get((mod.vendor, mod.product_type, mod.product_code)) or []
+            eth_ports = [d for d in defs if d.port_type == "Ethernet"]
+            if not eth_ports:
+                return "<EthernetPorts/>"
+            # One descriptor per integrated Ethernet port (these CPUs have exactly one).
+            # Port="1" is the CPU's own (first) Ethernet port in the EthernetPorts
+            # context; Label mirrors it; PortEnabled=true (active by default).
+            inner = "".join(
+                f'<EthernetPort Port="{n}" Label="{n}" PortEnabled="true"/>'
+                for n in range(1, len(eth_ports) + 1)
+            )
+            return f"<EthernetPorts>{inner}</EthernetPorts>"
+        return "<EthernetPorts/>"
+
+    def _section_xml(self, field_name: str, tag_name: str) -> str:
+        """Serialize a list-of-L5xElement field as <Tag>...</Tag> (or <Tag/>)."""
+        items = getattr(self, field_name, None) or []
+        if not items:
+            return f"<{tag_name}/>"
+        inner = "".join(item.to_xml() for item in items)
+        return f"<{tag_name}>{inner}</{tag_name}>"
 
 
 @dataclass
@@ -1302,6 +1389,8 @@ class DataTypeBuilder(L5xElementBuilder):
 class ModuleBuilder(L5xElementBuilder):
     # Map from modid (u32) → module name, built by ControllerBuilder and passed in.
     _modid_to_name: Dict[int, str] = field(default_factory=dict)
+    # Optional richer CIP-identity -> catalog-number table (None -> built-in only).
+    _catalog_table: Union[Dict[Tuple[int, int, int], str], None] = None
 
     def _ip_from_data_collection(self, icp_slot: int) -> str:
         """Look up the Ethernet IP for a local backplane module via RxDataCollection.
@@ -1577,7 +1666,9 @@ class ModuleBuilder(L5xElementBuilder):
         return Module(
             name,           # L5xElement._name (private)
             name,           # Module.name
-            CATALOG_NUMBERS.get((vendor, product_type, product_code), ""),
+            catalog_number_for_identity(
+                (vendor, product_type, product_code), table=self._catalog_table
+            ),
             vendor,
             product_type,
             product_code,
@@ -2690,6 +2781,10 @@ class TaskBuilder(L5xElementBuilder):
 
 @dataclass
 class ControllerBuilder(L5xElementBuilder):
+    # Optional richer CIP-identity -> catalog-number table for resolving module
+    # CatalogNumbers and the controller ProcessorType. None -> built-in only.
+    _catalog_table: Union[Dict[Tuple[int, int, int], str], None] = None
+
     def build(self) -> Controller:
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record_type, record FROM comps WHERE parent_id=0 AND record_type=256"
@@ -2953,7 +3048,10 @@ class ControllerBuilder(L5xElementBuilder):
             modules = []
             for _, mod_oid, _ in mod_rows:
                 modules.append(
-                    ModuleBuilder(self._cur, mod_oid, modid_to_name).build()
+                    ModuleBuilder(
+                        self._cur, mod_oid, modid_to_name,
+                        _catalog_table=self._catalog_table,
+                    ).build()
                 )
 
             # Third pass: compute (parent_name, parent_port_id) → child count,
@@ -2971,6 +3069,28 @@ class ControllerBuilder(L5xElementBuilder):
 
         # ProcessorType is the CatalogNumber of the root controller module (the one
         # whose parent is itself, i.e. MajorFault="true").
+        #
+        # A3 finding (Studio 5000 v35 import): Studio reads ProcessorType to identify
+        # the CPU. A real part number (e.g. "1756-L85E") imports cleanly. For an
+        # out-of-table CPU the value is the CIP-triple placeholder ("CIP-1-14-216"),
+        # which Studio does NOT recognise as a catalog, so it shows a "Change
+        # Controller Type" dialog (observed: defaulted to 1756-L1/5550) -- the user
+        # then picks the real CPU (e.g. 1756-L82E) and the import completes.
+        #
+        # We DELIBERATELY keep emitting the placeholder here (NOT omitting it):
+        # omitting ProcessorType makes Studio unable to create the project file at
+        # all ("Failed to create project file ... Couldn't be found", Error
+        # 716-80042001) -- a worse outcome than the prompt. The clean fix for an
+        # out-of-table CPU is to cover its identity in the external catalog (so
+        # catalog_number_for_identity resolves to a real number like "1756-L82");
+        # until then the placeholder degrades to a manual "Change Controller Type"
+        # step, which works.
+        # NOTE: the ProcessorType is derived from the CPU module's catalog_number
+        # (resolved above via ModuleBuilder with self._catalog_table), so a richer
+        # catalog (e.g. an external catalog merged over the built-in) flows through
+        # here automatically: an out-of-table CPU that IS in the external catalog
+        # gets a real ProcessorType (clean Studio import); one that is NOT still
+        # gets the CIP-... placeholder (the manual "Change Controller Type" case).
         processor_type = next(
             (m.catalog_number for m in modules if m.major_fault == "true" and m.catalog_number),
             None,
@@ -3116,14 +3236,18 @@ class DumpCompsRecords(L5xElementBuilder):
             object_id = result[1]
             name = result[0]
             record = result[4]
-            new_path = Path(os.path.join(self.base_directory, name))
+            # comp_name may contain path-unsafe characters (e.g. ":" in channel
+            # names on Windows). Use a sanitized component for the on-disk path;
+            # keep the original name in the log so nothing is lost.
+            safe_name = _sanitize_path_component(name)
+            new_path = Path(os.path.join(self.base_directory, safe_name))
             if os.path.exists(os.path.join(new_path)):
                 shutil.rmtree(os.path.join(new_path))
             if not os.path.exists(os.path.join(new_path)):
                 os.makedirs(new_path)
-            with open(Path(os.path.join(new_path, name + ".dat")), "wb") as file:
+            with open(Path(os.path.join(new_path, safe_name + ".dat")), "wb") as file:
                 log_file.write(
-                    f"Class - {struct.unpack_from('<H', result[4], 0xA)[0]} Instance {struct.unpack_from('<H', result[4], 0xC)[0]}- {str(new_path) + '/' + name}\n"
+                    f"Class - {struct.unpack_from('<H', result[4], 0xA)[0]} Instance {struct.unpack_from('<H', result[4], 0xC)[0]}- {name}\n"
                 )
                 file.write(record)
 
