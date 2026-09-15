@@ -184,6 +184,17 @@ class ExportL5x:
             self._project._file_order = self._file_order
             self._project._footer_unknown = self._footer_unknown
             self._project._id_to_name = self._id_to_name
+            # The sqlite connection (and its WAL/journal files) is only needed
+            # while the object tree above is being built. Left open, it holds
+            # an OS-level lock on acd.db inside _temp_dir for as long as this
+            # ExportL5x instance is alive -- on Windows that lock makes the
+            # caller's shutil.rmtree(temp_dir, ignore_errors=True) silently
+            # fail (ignore_errors swallows the PermissionError), so the temp
+            # directory is never actually removed. Across many files in one
+            # process (e.g. batch-converting a folder) those leaked temp dirs
+            # accumulate without bound and can fill the disk. Close it here,
+            # once the tree is fully built and nothing will query it again.
+            self._db.close()
         return self._project
 
     def populate_region_map(self):
