@@ -11,6 +11,8 @@ from pathlib import Path
 from sqlite3 import Cursor
 from typing import List, Tuple, Dict, Union
 
+from loguru import logger as log
+
 from acd.l5x.catalog_numbers import CATALOG_NUMBERS, catalog_number_for_identity
 from acd.l5x.port_structures import PORT_STRUCTURES
 from acd.record.rx import LegacyRxGeneric, RxGeneric
@@ -2770,16 +2772,34 @@ class TaskBuilder(L5xElementBuilder):
         # Format: u16 count followed by N u32 comment_ids.
         prog_count = struct.unpack_from("<H", task_data, program_offset)[0]
         max_program_count = (rate_offset - program_offset - 2) // 4
-        if prog_count > max_program_count:
-            raise ValueError("Task record contains too many scheduled programs")
         scheduled_programs = []
-        for i in range(prog_count):
-            cid = struct.unpack_from(
-                "<I", task_data, program_offset + 2 + i * 4
-            )[0]
-            prog_name = comment_id_to_program.get(cid)
-            if prog_name:
-                scheduled_programs.append(ScheduledProgram(prog_name, prog_name))
+        if prog_count > max_program_count:
+            # These are fixed offsets reverse-engineered from one reference
+            # file (CIPDemo_RevEng.ACD); observed on real, more recent
+            # project files where every field read at these offsets --
+            # rate/type/priority/watchdog included, not just the count -- is
+            # garbage (all zero, in one case), meaning the whole task record
+            # layout has shifted for that Studio/firmware version rather
+            # than just this one field being corrupt. Recovering the real
+            # offsets for that layout is unreverse-engineered work on the
+            # scale of the rest of this file, not a quick fix, so degrade
+            # gracefully: keep the task (with whatever the fixed offsets
+            # happened to read) but drop the unreadable schedule list
+            # instead of failing the entire project's export over it.
+            log.warning(
+                f"Task '{name}': scheduled-program count at the expected "
+                f"offset is implausible ({prog_count} > max {max_program_count}) "
+                "-- this task record's layout doesn't match the known format; "
+                "exporting it with an empty scheduled-program list"
+            )
+        else:
+            for i in range(prog_count):
+                cid = struct.unpack_from(
+                    "<I", task_data, program_offset + 2 + i * 4
+                )[0]
+                prog_name = comment_id_to_program.get(cid)
+                if prog_name:
+                    scheduled_programs.append(ScheduledProgram(prog_name, prog_name))
 
         event_info = None
         if task_type == "EVENT":
