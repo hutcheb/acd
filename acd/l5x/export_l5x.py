@@ -173,6 +173,26 @@ class ExportL5x:
             ).build()
         return self._controller
 
+    def st_decoder(self) -> "STDecoder":
+        """Return an STDecoder for this ACD file.
+
+        Must be called **before** accessing ``.project`` (which closes the
+        sqlite connection).  The returned :class:`STDecoder` holds its own
+        in-memory copy of all necessary data and remains usable after
+        ``.project`` is called.
+
+        Example::
+
+            exp = ExportL5x("project.acd")
+            dec = exp.st_decoder()          # create while DB is open
+            project = exp.project           # DB closes here; dec still works
+
+            for name, comps_id, lines in dec.all_routines():
+                print(f"{name}: {len(lines)} lines")
+        """
+        from acd.l5x.st_decoder import STDecoder  # local import avoids circular refs
+        return STDecoder(self)
+
     @property
     def project(self):
         if self._project is None:
