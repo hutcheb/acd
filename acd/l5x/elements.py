@@ -11,6 +11,8 @@ from pathlib import Path
 from sqlite3 import Cursor
 from typing import List, Tuple, Dict, Union
 
+from loguru import logger as log
+
 from acd.l5x.catalog_numbers import CATALOG_NUMBERS, catalog_number_for_identity
 from acd.l5x.port_structures import PORT_STRUCTURES
 from acd.record.rx import LegacyRxGeneric, RxGeneric
@@ -2030,16 +2032,33 @@ class TagBuilder(L5xElementBuilder):
             tag_type = "Base"
             if 0x6B in extended_records and ":" not in name:
                 tag_type = "Consumed" if 0x66 in extended_records else "Produced"
-            produce_info = (
-                self._legacy_produce_info(extended_records)
-                if tag_type == "Produced"
-                else None
-            )
-            consume_info = (
-                self._legacy_consume_info(extended_records)
-                if tag_type == "Consumed"
-                else None
-            )
+            try:
+                produce_info = (
+                    self._legacy_produce_info(extended_records)
+                    if tag_type == "Produced"
+                    else None
+                )
+                consume_info = (
+                    self._legacy_consume_info(extended_records)
+                    if tag_type == "Consumed"
+                    else None
+                )
+            except ValueError as e:
+                # ext[0x6B] (the produced/consumed link) can be present but
+                # empty -- observed on a real project file, an empty
+                # 0-length attribute value rather than the 4-byte object_id
+                # it's supposed to hold. There's no link to recover a
+                # produce/consume descriptor from in that case, so fall back
+                # to exporting this as a plain Base tag rather than failing
+                # the whole project's export over one tag's connection info.
+                log.warning(
+                    f"Tag '{name}': couldn't build its {tag_type.lower()} "
+                    f"connection info ({e}) -- exporting it as a Base tag "
+                    "instead"
+                )
+                tag_type = "Base"
+                produce_info = None
+                consume_info = None
             return Tag(
                 name,
                 name,
