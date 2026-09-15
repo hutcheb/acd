@@ -1319,11 +1319,25 @@ class DataTypeBuilder(L5xElementBuilder):
                 extended_record.value
             )
 
-        string_family_int = struct.unpack("<I", extended_records[0x6C])[0]
+        # Not every UDT's extended-record set carries all three of these --
+        # observed missing on real project files for plain user-defined types
+        # with no string/module-defined role. Default to the "plain UDT"
+        # reading (NoFamily / not built-in / not module-defined) instead of
+        # raising, matching the 0x64 (member_count) handling just below.
+        if 0x6C in extended_records and len(extended_records[0x6C]) == 0x04:
+            string_family_int = struct.unpack("<I", extended_records[0x6C])[0]
+        else:
+            string_family_int = 0
         string_family = "StringFamily" if string_family_int == 1 else "NoFamily"
 
-        built_in = struct.unpack("<I", extended_records[0x67])[0]
-        module_defined = struct.unpack("<I", extended_records[0x69])[0]
+        if 0x67 in extended_records and len(extended_records[0x67]) == 0x04:
+            built_in = struct.unpack("<I", extended_records[0x67])[0]
+        else:
+            built_in = 0
+        if 0x69 in extended_records and len(extended_records[0x69]) == 0x04:
+            module_defined = struct.unpack("<I", extended_records[0x69])[0]
+        else:
+            module_defined = 0
 
         class_type = "User"
         if module_defined > 0:
