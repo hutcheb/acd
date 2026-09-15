@@ -11,6 +11,8 @@ from pathlib import Path
 from sqlite3 import Cursor
 from typing import List, Tuple, Dict, Union
 
+from loguru import logger as log
+
 from acd.l5x.catalog_numbers import CATALOG_NUMBERS, catalog_number_for_identity
 from acd.l5x.port_structures import PORT_STRUCTURES
 from acd.record.rx import LegacyRxGeneric, RxGeneric
@@ -2977,19 +2979,48 @@ class ControllerBuilder(L5xElementBuilder):
         programs: List[Program] = []
         for result in program_records:
             _program_object_id = result[1]
-            programs.append(
-                ProgramBuilder(self._cur, _program_object_id, data_types_map, redundancy_enabled).build()
-            )
+            try:
+                programs.append(
+                    ProgramBuilder(self._cur, _program_object_id, data_types_map, redundancy_enabled).build()
+                )
+            except Exception as e:
+                # Observed on a real project file: one program's comps record
+                # has a corrupt extended-attribute length prefix partway
+                # through (a kaitaistruct EndOfStreamError reading it), with
+                # no way to resync to the right attribute boundaries once
+                # that happens. Losing that one program's routines/tags is
+                # far better than losing the whole project's export over it.
+                program_name = result[0]
+                log.warning(
+                    f"Program '{program_name}' (object_id={_program_object_id}): "
+                    f"failed to parse its comps record ({type(e).__name__}: {e}) "
+                    "-- exporting it as an empty placeholder program"
+                )
+                programs.append(
+                    Program(program_name, program_name, "false", None, None,
+                             "false", None, "false", [], [])
+                )
 
         # Build task schedule ID → program name map. Legacy projects keep this
         # ID in program attribute 0x01; newer records use the Rx comment ID.
         self._cur.execute(
             "SELECT comp_name, record FROM comps WHERE parent_id=" + str(_program_collection_object_id)
         )
-        comment_id_to_program: Dict[int, str] = {
-            _program_schedule_id(bytes(rec)): pname
-            for pname, rec in self._cur.fetchall()
-        }
+        comment_id_to_program: Dict[int, str] = {}
+        for pname, rec in self._cur.fetchall():
+            try:
+                comment_id_to_program[_program_schedule_id(bytes(rec))] = pname
+            except Exception as e:
+                # Same corrupt-comps-record case ProgramBuilder.build() above
+                # already tolerates (a program whose extended-attribute list
+                # can't be parsed at all). This program just won't be
+                # resolvable as a task's scheduled program -- better than
+                # losing the whole project's export over one bad record.
+                log.warning(
+                    f"Program '{pname}': couldn't determine its task-schedule "
+                    f"ID ({type(e).__name__}: {e}) -- it won't appear in any "
+                    "task's scheduled-program list"
+                )
 
         # Get the Task Collection and build Tasks
         self._cur.execute(
