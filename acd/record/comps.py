@@ -44,6 +44,16 @@ class CompsRecord:
             "<I", raw, 0x0C
         )[0] != 0:
             object_id, parent_id = struct.unpack_from("<II", raw, 0x0C)
+
+            # 0xFFFFFFFF is the sentinel Rockwell uses for "no object" --
+            # observed on real project files as a deleted/tombstoned legacy
+            # record left behind in Comps.Dat with a minimal, otherwise
+            # inconsistent payload (its length fields don't describe a real
+            # object). It carries nothing worth exporting, so skip it instead
+            # of validating a payload that was never meant to be read.
+            if object_id == 0xFFFFFFFF:
+                return None
+
             name_buffer = raw[0x14:0x90]
             name_length = next(
                 (
