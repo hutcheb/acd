@@ -1918,7 +1918,13 @@ class TagBuilder(L5xElementBuilder):
         return atomic_types.get(record.main_record.runtime_type & 0xFF, "")
 
     def _legacy_alias_for(self, value: bytes) -> str:
-        if len(value) % 2 or not value.endswith(b"\x00\x00"):
+        # Usually null-terminated (a trailing b"\x00\x00" utf-16 code unit),
+        # but observed on real project files without one -- a path ending in
+        # a literal ".<member/bit>" reference (e.g. an alias into a bit or an
+        # array/structure member) can occupy the field's full length with no
+        # terminator at all. The length just needs to be a whole number of
+        # utf-16 code units; a missing terminator isn't itself invalid.
+        if len(value) % 2:
             raise ValueError("Invalid legacy alias path")
         path = value.decode("utf-16-le").rstrip("\x00")
 
