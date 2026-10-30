@@ -932,20 +932,22 @@ class Routine(L5xElement):
 
 @dataclass
 class AOI(L5xElement):
+    # Attributes and sections set to None are omitted from the XML. A
+    # source-protected AOI uses None for everything that is stored encrypted.
     name: str
-    revision: str
-    revision_extension: Union[str, None]  # None if absent (omitted from XML)
-    vendor: Union[str, None]  # None if absent (omitted from XML)
-    execute_prescan: str
-    execute_postscan: str
-    execute_enable_in_false: str
-    created_date: str
-    created_by: str
-    edited_date: str
-    edited_by: str
-    software_revision: str
-    parameters: List[Parameter]
-    local_tags: List[LocalTag]
+    revision: Union[str, None]
+    revision_extension: Union[str, None]
+    vendor: Union[str, None]
+    execute_prescan: Union[str, None]
+    execute_postscan: Union[str, None]
+    execute_enable_in_false: Union[str, None]
+    created_date: Union[str, None]
+    created_by: Union[str, None]
+    edited_date: Union[str, None]
+    edited_by: Union[str, None]
+    software_revision: Union[str, None]
+    parameters: Union[List[Parameter], None]
+    local_tags: Union[List[LocalTag], None]
     routines: List[Routine]
     _description: Union[str, None] = field(default=None)
     _revision_note: str = field(default="")
@@ -959,7 +961,9 @@ class AOI(L5xElement):
         idx = base.index(">")
         inject = ""
         if self._description:
-            inject += f'<Description>\n<![CDATA[{self._description}]]>\n</Description>'
+            # A CDATA section cannot contain "]]>", so split it across two.
+            description = self._description.replace("]]>", "]]]]><![CDATA[>")
+            inject += f'<Description>\n<![CDATA[{description}]]>\n</Description>'
         if self._revision_note:
             inject += f'<RevisionNote>\n<![CDATA[{self._revision_note}]]>\n</RevisionNote>'
         return base[:idx + 1] + inject + base[idx + 1:]
@@ -2565,8 +2569,73 @@ def _parse_aoi_nameless(data: bytes) -> dict:
     return result
 
 
+def _aoi_data_type_description(cur, name: str) -> Union[str, None]:
+    """Description of an AOI read from its backing data type's comments.
+
+    A source-protected AOI keeps its own comments encrypted, but the data
+    type that Logix creates for it (same name, in RxDataTypeCollection) holds
+    the same description in plain text.
+    """
+    cur.execute(
+        "SELECT c.record FROM comps c JOIN comps p ON c.parent_id = p.object_id "
+        "WHERE p.comp_name='RxDataTypeCollection' AND c.comp_name=?",
+        (name,),
+    )
+    row = cur.fetchone()
+    if row is None:
+        return None
+    try:
+        r = RxGeneric.from_bytes(bytes(row[0]))
+    except Exception:
+        return None
+    cur.execute(
+        "SELECT record_string FROM comments WHERE parent=? AND member_ref=0 "
+        "AND record_type=1 AND object_id=1 AND tag_reference='' LIMIT 1",
+        ((r.comment_id * 0x10000) + r.cip_type,),
+    )
+    desc_row = cur.fetchone()
+    return desc_row[0] if desc_row and desc_row[0] else None
+
+
 @dataclass
 class AoiBuilder(L5xElementBuilder):
+    def _routines(self) -> List[Routine]:
+        routines: List[Routine] = []
+        self._cur.execute(
+            "SELECT object_id FROM comps WHERE parent_id=? AND comp_name='RxRoutineCollection'",
+            (self._object_id,),
+        )
+        routine_coll_row = self._cur.fetchone()
+        if routine_coll_row:
+            self._cur.execute(
+                "SELECT object_id FROM comps WHERE parent_id=?", (routine_coll_row[0],)
+            )
+            for (child_oid,) in self._cur.fetchall():
+                try:
+                    routines.append(RoutineBuilder(self._cur, child_oid, _notes=self._notes).build())
+                except Exception:
+                    pass
+        return routines
+
+    def _build_protected(self, name: str) -> AOI:
+        # Only the name, the description (via the backing data type) and the
+        # routine names and types are stored readably. Revision, vendor,
+        # dates, help text and the parameter/local-tag split are encrypted,
+        # so they are left out rather than guessed.
+        self._notes.warn(
+            f"Add-On Instruction '{name}' is source-protected: its revision, vendor, "
+            "dates, help text, parameters and local tags are encrypted and were left "
+            "out; only its name, description and routine names were exported"
+        )
+        return AOI(
+            name, name, None, None, None,
+            None, None, None,
+            None, None, None, None, None,
+            None, None, self._routines(),
+            _aoi_data_type_description(self._cur, name),
+            "",
+        )
+
     def build(self) -> AOI:
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
@@ -2576,18 +2645,20 @@ class AoiBuilder(L5xElementBuilder):
 
         aoi_record = bytes(results[0][3])
         name = results[0][0]
+        try:
+            _r_aoi = RxGeneric.from_bytes(aoi_record, allow_protected=True)
+        except Exception:
+            _r_aoi = None
+        if _r_aoi is not None and _r_aoi.protected:
+            return self._build_protected(name)
 
         # --- Revision (major.minor) from ext[0x01] ---
-        _r_aoi: Union[RxGeneric, None] = None
-        try:
-            r = RxGeneric.from_bytes(aoi_record)
-            _r_aoi = r
-            exts: Dict[int, bytes] = {e.attribute_id: bytes(e.value) for e in r.extended_records}
+        rev_major, rev_minor = 1, 0
+        if _r_aoi is not None:
+            exts: Dict[int, bytes] = {e.attribute_id: bytes(e.value) for e in _r_aoi.extended_records}
             e01 = exts.get(0x01, b"")
             rev_major = struct.unpack_from("<H", e01, 0x1A)[0] if len(e01) > 0x1B else 1
             rev_minor = struct.unpack_from("<H", e01, 0x1C)[0] if len(e01) > 0x1D else 0
-        except Exception:
-            rev_major, rev_minor = 1, 0
         revision = f"{rev_major}.{rev_minor}"
 
         # --- Vendor from comps record ---
@@ -2608,7 +2679,6 @@ class AoiBuilder(L5xElementBuilder):
 
         parameters: List[Parameter] = []
         local_tags: List[LocalTag] = []
-        routines: List[Routine] = []
 
         # --- Extract Parameters and LocalTags from RxTagCollection ---
         self._cur.execute(
@@ -2653,23 +2723,7 @@ class AoiBuilder(L5xElementBuilder):
                     except Exception:
                         pass
 
-        # --- Extract Routines from RxRoutineCollection ---
-        self._cur.execute(
-            "SELECT object_id FROM comps WHERE parent_id="
-            + str(self._object_id)
-            + " AND comp_name='RxRoutineCollection'"
-        )
-        routine_coll_row = self._cur.fetchone()
-        if routine_coll_row:
-            routine_coll_oid = routine_coll_row[0]
-            self._cur.execute(
-                "SELECT object_id FROM comps WHERE parent_id=" + str(routine_coll_oid)
-            )
-            for (child_oid,) in self._cur.fetchall():
-                try:
-                    routines.append(RoutineBuilder(self._cur, child_oid, _notes=self._notes).build())
-                except Exception:
-                    pass
+        routines = self._routines()
 
         # --- Description + RevisionNote ---
         aoi_description: Union[str, None] = None
