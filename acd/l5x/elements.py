@@ -2369,6 +2369,18 @@ def routine_type_enum(idx: int) -> str:
     return "Typeless"
 
 
+def _routine_owner_name(cur: Cursor, collection_id: int) -> str:
+    # A routine's parent is its routine collection, whose parent is the
+    # owning program or Add-On Instruction.
+    cur.execute(
+        "SELECT o.comp_name FROM comps c JOIN comps o ON o.object_id = c.parent_id "
+        "WHERE c.object_id=?",
+        (collection_id,),
+    )
+    row = cur.fetchone()
+    return row[0] if row else ""
+
+
 @dataclass
 class RoutineBuilder(L5xElementBuilder):
     def build(self) -> Routine:
@@ -2379,9 +2391,27 @@ class RoutineBuilder(L5xElementBuilder):
         results = self._cur.fetchall()
 
         try:
-            r = RxGeneric.from_bytes(results[0][3])
-        except Exception as e:
-            return Routine(results[0][0], results[0][0], "", [])
+            r = RxGeneric.from_bytes(results[0][3], allow_protected=True)
+        except Exception:
+            r = None
+        if r is None or r.protected:
+            # A source-protected routine's attributes are encrypted, but its
+            # 60-byte main record is intact, so the routine type can still be
+            # read from it (0x30 of the main record, which starts at 14). An
+            # unreadable record gets the same fallback.
+            raw = bytes(results[0][3])
+            routine_type = (
+                routine_type_enum(struct.unpack_from("<H", raw, 14 + 0x30)[0])
+                if len(raw) >= 74
+                else ""
+            )
+            owner = _routine_owner_name(self._cur, results[0][2])
+            self._notes.warn_grouped(
+                "Routines whose content could not be read (likely source-protected), "
+                "exported with no rungs",
+                f"{owner + '/' if owner else ''}{results[0][0]}",
+            )
+            return Routine(results[0][0], results[0][0], routine_type, [])
 
         record = results[0][3]
         name = results[0][0]
