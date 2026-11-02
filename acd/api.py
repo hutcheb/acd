@@ -199,9 +199,8 @@ class ImportProjectFromFile(ImportProject):
 
     def import_project(self) -> RSLogix5000Content:
         # Import Project Interface
-        table = _resolve_catalog_table(self.catalog_file)
-        export = ExportL5x(self.filename, _catalog_table=table)
-        return export.project
+        # load_acd removes its temporary extraction directory afterwards.
+        return load_acd(self.filename, catalog_file=self.catalog_file)
 
 
 @dataclass
