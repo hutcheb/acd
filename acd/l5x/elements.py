@@ -40,6 +40,16 @@ def _escape_xml_attr(value: object) -> str:
     return text.replace("\t", "&#x9;").replace("\r", "&#xD;").replace("\n", "&#xA;")
 
 
+def _cdata_section(text: str) -> str:
+    """Wrap text in a CDATA section, stripping XML-illegal characters.
+
+    A CDATA section cannot contain ``]]>``, so that sequence is split across
+    two sections (``]]]]><![CDATA[>``), which is how Rockwell escapes it.
+    """
+    text = _XML_ILLEGAL_RE.sub("", text).replace("]]>", "]]]]><![CDATA[>")
+    return f"<![CDATA[{text}]]>"
+
+
 # Characters that are illegal in Windows (and some other) filesystem names.
 # comp_name values are Logix tag/channel names and can legally contain
 # ":" (e.g. "CHANNEL_DI_TIMESTAMP:O:0"), "/" and "\" (member access), and
@@ -906,9 +916,11 @@ class Routine(L5xElement):
     rungs: List[str]
     _rung_ids: List[int] = field(default_factory=list)
     _rung_comments: Dict[int, str] = field(default_factory=dict)
+    _st_lines: List[str] = field(default_factory=list)
 
     def to_xml(self) -> str:
         rll_content = ""
+        st_content = ""
         if self.type == "RLL" and self.rungs:
             rung_xmls = []
             for i, rung_text in enumerate(self.rungs):
@@ -927,7 +939,14 @@ class Routine(L5xElement):
                 )
             if rung_xmls:
                 rll_content = f'<RLLContent>{"".join(rung_xmls)}</RLLContent>'
-        return f'<Routine Name="{_escape_xml_attr(self.name)}" Type="{self.type}">{rll_content}</Routine>'
+        if self.type == "ST" and self._st_lines:
+            # Blank lines are kept: the line number is the position in the source.
+            line_xmls = [
+                f'<Line Number="{i}">{_cdata_section(text)}</Line>'
+                for i, text in enumerate(self._st_lines)
+            ]
+            st_content = f'<STContent>{"".join(line_xmls)}</STContent>'
+        return f'<Routine Name="{_escape_xml_attr(self.name)}" Type="{self.type}">{rll_content}{st_content}</Routine>'
 
 
 @dataclass
@@ -2456,7 +2475,20 @@ class RoutineBuilder(L5xElementBuilder):
                 name,
             )
 
-        return Routine(name, name, routine_type, rungs, rung_ids, rung_comments)
+        st_lines: List[str] = []
+        if routine_type == "ST":
+            self._cur.execute(
+                "SELECT text FROM st_lines WHERE routine_id=? ORDER BY line_number",
+                (self._object_id,),
+            )
+            st_lines = [row[0] for row in self._cur.fetchall()]
+            if not st_lines:
+                self._notes.warn_grouped(
+                    "Structured Text routines with no decoded lines, exported empty",
+                    name,
+                )
+
+        return Routine(name, name, routine_type, rungs, rung_ids, rung_comments, _st_lines=st_lines)
 
 
 def _parse_fffeff(data: bytes, offset: int):

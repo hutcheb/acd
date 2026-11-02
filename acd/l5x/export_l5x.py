@@ -169,6 +169,25 @@ class ExportL5x:
         self._cur.executemany("INSERT INTO nameless VALUES (?,?,?)", nameless_tuples)
         self._db.commit()
 
+        # Structured Text source lines, keyed by the routine's comps object_id.
+        # A decoding failure leaves the table empty; the routines then export
+        # with no lines, each with a warning.
+        self._cur.execute("CREATE TABLE st_lines(routine_id int, line_number int, text text)")
+        try:
+            st_tuples = [
+                (comps_id, number, text)
+                for _name, comps_id, lines in self.st_decoder().all_routines()
+                for number, text in enumerate(lines)
+            ]
+            self._cur.executemany("INSERT INTO st_lines VALUES (?,?,?)", st_tuples)
+            self._db.commit()
+        except Exception as exc:
+            self._notes.warn(
+                "Structured Text routine bodies could not be decoded; "
+                "ST routines were exported with no lines",
+                str(exc),
+            )
+
         log.info("Creating indexes for fast object graph queries")
         self._cur.execute("CREATE INDEX idx_comps_object_id ON comps(object_id)")
         self._cur.execute("CREATE INDEX idx_comps_parent_id ON comps(parent_id)")
@@ -176,6 +195,7 @@ class ExportL5x:
         self._cur.execute("CREATE INDEX idx_rungs_object_id ON rungs(object_id)")
         self._cur.execute("CREATE INDEX idx_region_map_parent_id ON region_map(parent_id)")
         self._cur.execute("CREATE INDEX idx_comments_parent ON comments(parent)")
+        self._cur.execute("CREATE INDEX idx_st_lines_routine_id ON st_lines(routine_id)")
         self._db.commit()
 
     @property
