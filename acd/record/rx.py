@@ -58,10 +58,17 @@ class LegacyRxGeneric:
         self.extended_records: List[LegacyAttributeRecord] = []
 
         offset = 32
+        # Like the LastAttributeRecord of the generated layout, the last
+        # attribute declares 4 bytes more than the record holds.  With a short
+        # value (e.g. an empty CommPath 0x6A of length 2) the missing bytes
+        # already cut into the attribute header, so read the header from a
+        # zero-padded copy and let the length check below decide.
+        padded = raw + b"\x00" * 4
         for index in range(self.count_record):
-            if offset + 8 > len(raw):
+            last = index == self.count_record - 1
+            if offset + 8 > len(raw) + (4 if last else 0):
                 raise ValueError("Invalid legacy Rx attribute header")
-            attribute_id, length = struct.unpack_from("<II", raw, offset)
+            attribute_id, length = struct.unpack_from("<II", padded, offset)
             value_end = offset + 8 + length
             if value_end > len(raw):
                 if index == self.count_record - 1 and value_end == len(raw) + 4:

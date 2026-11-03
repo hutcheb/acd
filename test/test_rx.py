@@ -479,3 +479,19 @@ def test_legacy_task_rejects_excess_program_count():
             TaskBuilder(cursor, 100).build({})
     finally:
         database.close()
+
+
+def test_legacy_rx_last_attribute_short_header():
+    # The last attribute declares 4 bytes more than the record holds. With a
+    # 2-byte value the shortfall already reaches into the attribute header.
+    raw = bytearray(_legacy_rx(attributes=[(0x6E, b"\x01" * 12), (0x6A, b"\x00\x00")]))
+    del raw[-4:]
+    struct.pack_into("<I", raw, 24, len(raw) - 24)
+
+    parsed = RxGeneric.from_bytes(bytes(raw))
+
+    assert isinstance(parsed, LegacyRxGeneric)
+    assert [(a.attribute_id, a.value) for a in parsed.extended_records] == [
+        (0x6E, b"\x01" * 12),
+        (0x6A, b""),
+    ]
