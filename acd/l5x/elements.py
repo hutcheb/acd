@@ -2050,7 +2050,14 @@ class TagBuilder(L5xElementBuilder):
                 str(dimension) for dimension in dimensions if dimension
             ) or None
             tag_type = "Base"
-            if 0x6B in extended_records and ":" not in name:
+            # A produced/consumed tag carries its linked-data reference in the
+            # 0x6B extended record as a 4-byte object id. Some projects leave a
+            # short/empty 0x6B stub on an ordinary base tag; that is not a real
+            # produce/consume link (it cannot reference linked data), so only
+            # classify as Produced/Consumed when the link is a full reference.
+            # Otherwise the tag stays Base instead of aborting the whole export
+            # in _legacy_linked_data.
+            if len(extended_records.get(0x6B, b"")) >= 4 and ":" not in name:
                 tag_type = "Consumed" if 0x66 in extended_records else "Produced"
             try:
                 produce_info = (
@@ -2420,6 +2427,16 @@ class RoutineBuilder(L5xElementBuilder):
                     rung_comments[rung_index] = rec_str
         except Exception:
             pass
+
+        # Some firmware revisions store the routine type in a record layout
+        # where the usual type field reads back 0 (TypeLess) even though the
+        # routine carries ladder logic. The rung text here comes from "Rung NT"
+        # SbRegion regions, which are RLL ladder rungs, so a TypeLess routine
+        # that actually has rungs is an RLL routine whose type byte could not be
+        # read from this layout. Classify it RLL so its logic is emitted instead
+        # of silently dropped (Routine.to_xml only serialises rungs for RLL).
+        if routine_type == "TypeLess" and rungs:
+            routine_type = "RLL"
 
         return Routine(name, name, routine_type, rungs, rung_ids, rung_comments)
 
@@ -2989,9 +3006,33 @@ class ControllerBuilder(L5xElementBuilder):
         )
         results = self._cur.fetchall()
         tags: List[Tag] = []
+        # Tags that parse are exported; a tag this builder cannot faithfully
+        # reconstruct (an unexpected descriptor layout for this firmware, a
+        # dangling reference) is recorded and skipped rather than aborting the
+        # whole controller export. This keeps "emit L5X for the readable
+        # objects" honest: everything readable comes out, and what could not be
+        # rendered is reported in _skipped_tags instead of silently guessed.
+        skipped_tags: List[Dict[str, object]] = []
         for result in results:
             _tag_object_id = result[1]
-            tag = TagBuilder(self._cur, _tag_object_id).build()
+            tag_name = result[0]
+            try:
+                tag = TagBuilder(self._cur, _tag_object_id).build()
+            except ValueError as exc:
+                log.warning(
+                    "Skipping controller tag {} (object {}): {}",
+                    tag_name,
+                    _tag_object_id,
+                    exc,
+                )
+                skipped_tags.append(
+                    {
+                        "name": tag_name,
+                        "object_id": _tag_object_id,
+                        "reason": str(exc),
+                    }
+                )
+                continue
             tag._data_types_map = data_types_map
             if (
                 (tag.data_type or tag.tag_type == "Alias")
@@ -3164,7 +3205,7 @@ class ControllerBuilder(L5xElementBuilder):
             if _ctrl_slot is not None:
                 comm_path = _comm_path_prefix + str(_ctrl_slot)
 
-        return Controller(
+        controller = Controller(
             controller_name,
             "Target",
             controller_name,
@@ -3196,6 +3237,10 @@ class ControllerBuilder(L5xElementBuilder):
             aois,
             redundancy_enabled,
         )
+        # Diagnostics: controller-scoped tags that could not be faithfully
+        # reconstructed (see the tag loop above). Empty when everything parsed.
+        controller._skipped_tags = skipped_tags
+        return controller
 
 
 @dataclass
