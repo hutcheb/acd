@@ -18,6 +18,7 @@
 #
 import subprocess
 import platform
+import shutil
 
 from setuptools import setup, find_packages
 from setuptools.command.install import install as _install
@@ -38,8 +39,28 @@ class install(_install):
             kaitai_compiler_executable = "kaitai-struct-compiler.bat"
         else:
             print("Linux or Mac Detected, using the ksc executable")
-            kaitai_compiler_executable = "ksc"       
+            kaitai_compiler_executable = "ksc"
         print("--------------------------------------------------------------------")
+        # The generated acd/generated/**.py files are committed to the repo,
+        # so a working install doesn't strictly need the Kaitai Struct
+        # compiler on PATH -- it's only needed to *regenerate* them after
+        # editing a .ksy template. Previously this unconditionally called
+        # subprocess.run(kaitai_compiler_executable, ...), which raised
+        # FileNotFoundError and aborted `pip install .` outright on any
+        # machine without the compiler installed, even though nothing here
+        # actually needed to run. Skip regeneration (with a warning) instead
+        # of failing the whole install when the compiler isn't found.
+        if shutil.which(kaitai_compiler_executable) is None:
+            print(
+                f"'{kaitai_compiler_executable}' not found on PATH -- skipping "
+                "regeneration of acd/generated/**.py and using the versions "
+                "already committed to the repo. Install the Kaitai Struct "
+                "compiler first if you've edited a .ksy template and need "
+                "to regenerate its parser."
+            )
+            _install.run(self)
+            print("--------------------------------------------------------------------")
+            return
         print("Compiling Dat/Day.ksy")
         subprocess.run(
             [
