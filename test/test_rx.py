@@ -3,8 +3,10 @@ import struct
 
 import pytest
 
-from acd.l5x.elements import TagBuilder, TaskBuilder, _program_schedule_id
+from acd.l5x.elements import RoutineBuilder, TagBuilder, TaskBuilder, _program_schedule_id
 from acd.record.rx import LegacyRxGeneric, RxGeneric
+
+from .rx_fixtures import protected_rx_record
 
 
 def _metadata(name, runtime_type=0xC4, dimensions=(0, 0, 0), schedule_id=None):
@@ -495,3 +497,41 @@ def test_legacy_rx_last_attribute_short_header():
         (0x6E, b"\x01" * 12),
         (0x6A, b""),
     ]
+
+
+def _rll_main_record() -> bytes:
+    # 60-byte main record with routine type 1 (RLL) at 0x30.
+    main = bytearray(60)
+    struct.pack_into("<H", main, 0x30, 1)
+    return bytes(main)
+
+
+def _build_routine_logging_warnings(record):
+    from loguru import logger
+
+    warnings = []
+    sink = logger.add(warnings.append, level="WARNING")
+    database, cursor = _database()
+    try:
+        _insert(cursor, 100, "Logic", record)
+        return RoutineBuilder(cursor, 100).build(), warnings
+    finally:
+        logger.remove(sink)
+        database.close()
+
+
+def test_protected_routine_keeps_its_type():
+    # 14-byte header, the main record, then an extended-attribute area whose
+    # lengths are unreadable (encrypted).
+    header = struct.pack("<IIHHH", 0, 0, 0, 0x6D, 0)
+    record = header + _rll_main_record() + struct.pack("<II", 999, 2) + struct.pack("<II", 0x01, 0x55555555)
+    routine, warnings = _build_routine_logging_warnings(record)
+    assert (routine.type, routine.rungs) == ("RLL", [])
+    assert len(warnings) == 1 and "could not be read" in warnings[0]
+
+
+def test_protected_routine_with_envelope_marker_keeps_its_type():
+    # The encrypted envelope in place of the attributes.
+    routine, warnings = _build_routine_logging_warnings(protected_rx_record(0x6D, main=_rll_main_record()))
+    assert (routine.type, routine.rungs) == ("RLL", [])
+    assert len(warnings) == 1 and "could not be read" in warnings[0]

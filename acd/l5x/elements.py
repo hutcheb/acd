@@ -14,6 +14,7 @@ from typing import List, Tuple, Dict, Union
 from loguru import logger as log
 
 from acd.l5x.catalog_numbers import CATALOG_NUMBERS, catalog_number_for_identity
+from acd.l5x.conversion_notes import ConversionNotes, xml_comment
 from acd.l5x.port_structures import PORT_STRUCTURES
 from acd.record.rx import LegacyRxGeneric, RxGeneric
 
@@ -75,6 +76,8 @@ def _sanitize_path_component(name: str) -> str:
 class L5xElementBuilder:
     _cur: Cursor
     _object_id: int = -1
+    # Notes for this conversion, shared by every builder in it. Pass it by keyword.
+    _notes: ConversionNotes = field(default_factory=ConversionNotes)
 
 
 def _get_program_records(cur: Cursor, collection_id: int) -> List[Tuple[str, int, int, bytes]]:
@@ -929,20 +932,22 @@ class Routine(L5xElement):
 
 @dataclass
 class AOI(L5xElement):
+    # Attributes and sections set to None are omitted from the XML. A
+    # source-protected AOI uses None for everything that is stored encrypted.
     name: str
-    revision: str
-    revision_extension: Union[str, None]  # None if absent (omitted from XML)
-    vendor: Union[str, None]  # None if absent (omitted from XML)
-    execute_prescan: str
-    execute_postscan: str
-    execute_enable_in_false: str
-    created_date: str
-    created_by: str
-    edited_date: str
-    edited_by: str
-    software_revision: str
-    parameters: List[Parameter]
-    local_tags: List[LocalTag]
+    revision: Union[str, None]
+    revision_extension: Union[str, None]
+    vendor: Union[str, None]
+    execute_prescan: Union[str, None]
+    execute_postscan: Union[str, None]
+    execute_enable_in_false: Union[str, None]
+    created_date: Union[str, None]
+    created_by: Union[str, None]
+    edited_date: Union[str, None]
+    edited_by: Union[str, None]
+    software_revision: Union[str, None]
+    parameters: Union[List[Parameter], None]
+    local_tags: Union[List[LocalTag], None]
     routines: List[Routine]
     _description: Union[str, None] = field(default=None)
     _revision_note: str = field(default="")
@@ -956,7 +961,9 @@ class AOI(L5xElement):
         idx = base.index(">")
         inject = ""
         if self._description:
-            inject += f'<Description>\n<![CDATA[{self._description}]]>\n</Description>'
+            # A CDATA section cannot contain "]]>", so split it across two.
+            description = self._description.replace("]]>", "]]]]><![CDATA[>")
+            inject += f'<Description>\n<![CDATA[{description}]]>\n</Description>'
         if self._revision_note:
             inject += f'<RevisionNote>\n<![CDATA[{self._revision_note}]]>\n</RevisionNote>'
         return base[:idx + 1] + inject + base[idx + 1:]
@@ -1145,10 +1152,18 @@ class RSLogix5000Content(L5xElement):
     contains_context: str
     export_date: str
     export_options: str
+    # Fallbacks taken during the conversion, written as an XML comment at the
+    # top of the file. Empty means no comment.
+    conversion_notes: List[str] = field(default_factory=list)
 
     def __post_init__(self):
         super().__post_init__()
         self._export_name = "RSLogix5000Content"
+
+    def to_xml(self) -> str:
+        # The comment comes before the root element, so it lands right after
+        # the XML declaration that the caller writes first.
+        return xml_comment(self.conversion_notes) + super().to_xml()
 
 
 def radix_enum(i: int) -> str:
@@ -1400,9 +1415,11 @@ class DataTypeBuilder(L5xElementBuilder):
                 try:
                     children.append(
                         MemberBuilder(
-                            self._cur, child[1], bytes(extended_records[key]),
-                            offset60_to_name,
-                            last_hidden_backing,
+                            self._cur, child[1],
+                            record=bytes(extended_records[key]),
+                            _offset60_to_name=offset60_to_name,
+                            _fallback_target=last_hidden_backing,
+                            _notes=self._notes,
                         ).build()
                     )
                 except Exception:
@@ -2078,10 +2095,10 @@ class TagBuilder(L5xElementBuilder):
                 # produce/consume descriptor from in that case, so fall back
                 # to exporting this as a plain Base tag rather than failing
                 # the whole project's export over one tag's connection info.
-                log.warning(
-                    f"Tag '{name}': couldn't build its {tag_type.lower()} "
-                    f"connection info ({e}) -- exporting it as a Base tag "
-                    "instead"
+                self._notes.warn(
+                    f"Tag '{name}': {tag_type.lower()} connection info could not "
+                    "be read; exported as a Base tag",
+                    str(e),
                 )
                 tag_type = "Base"
                 produce_info = None
@@ -2356,6 +2373,18 @@ def routine_type_enum(idx: int) -> str:
     return "Typeless"
 
 
+def _routine_owner_name(cur: Cursor, collection_id: int) -> str:
+    # A routine's parent is its routine collection, whose parent is the
+    # owning program or Add-On Instruction.
+    cur.execute(
+        "SELECT o.comp_name FROM comps c JOIN comps o ON o.object_id = c.parent_id "
+        "WHERE c.object_id=?",
+        (collection_id,),
+    )
+    row = cur.fetchone()
+    return row[0] if row else ""
+
+
 @dataclass
 class RoutineBuilder(L5xElementBuilder):
     def build(self) -> Routine:
@@ -2366,9 +2395,27 @@ class RoutineBuilder(L5xElementBuilder):
         results = self._cur.fetchall()
 
         try:
-            r = RxGeneric.from_bytes(results[0][3])
-        except Exception as e:
-            return Routine(results[0][0], results[0][0], "", [])
+            r = RxGeneric.from_bytes(results[0][3], allow_protected=True)
+        except Exception:
+            r = None
+        if r is None or r.protected:
+            # A source-protected routine's attributes are encrypted, but its
+            # 60-byte main record is intact, so the routine type can still be
+            # read from it (0x30 of the main record, which starts at 14). An
+            # unreadable record gets the same fallback.
+            raw = bytes(results[0][3])
+            routine_type = (
+                routine_type_enum(struct.unpack_from("<H", raw, 14 + 0x30)[0])
+                if len(raw) >= 74
+                else ""
+            )
+            owner = _routine_owner_name(self._cur, results[0][2])
+            self._notes.warn_grouped(
+                "Routines whose content could not be read (likely source-protected), "
+                "exported with no rungs",
+                f"{owner + '/' if owner else ''}{results[0][0]}",
+            )
+            return Routine(results[0][0], results[0][0], routine_type, [])
 
         record = results[0][3]
         name = results[0][0]
@@ -2437,6 +2484,11 @@ class RoutineBuilder(L5xElementBuilder):
         # of silently dropped (Routine.to_xml only serialises rungs for RLL).
         if routine_type == "TypeLess" and rungs:
             routine_type = "RLL"
+            self._notes.warn_grouped(
+                "Routines with no readable type but with ladder rungs, "
+                "exported as RLL",
+                name,
+            )
 
         return Routine(name, name, routine_type, rungs, rung_ids, rung_comments)
 
@@ -2517,8 +2569,73 @@ def _parse_aoi_nameless(data: bytes) -> dict:
     return result
 
 
+def _aoi_data_type_description(cur, name: str) -> Union[str, None]:
+    """Description of an AOI read from its backing data type's comments.
+
+    A source-protected AOI keeps its own comments encrypted, but the data
+    type that Logix creates for it (same name, in RxDataTypeCollection) holds
+    the same description in plain text.
+    """
+    cur.execute(
+        "SELECT c.record FROM comps c JOIN comps p ON c.parent_id = p.object_id "
+        "WHERE p.comp_name='RxDataTypeCollection' AND c.comp_name=?",
+        (name,),
+    )
+    row = cur.fetchone()
+    if row is None:
+        return None
+    try:
+        r = RxGeneric.from_bytes(bytes(row[0]))
+    except Exception:
+        return None
+    cur.execute(
+        "SELECT record_string FROM comments WHERE parent=? AND member_ref=0 "
+        "AND record_type=1 AND object_id=1 AND tag_reference='' LIMIT 1",
+        ((r.comment_id * 0x10000) + r.cip_type,),
+    )
+    desc_row = cur.fetchone()
+    return desc_row[0] if desc_row and desc_row[0] else None
+
+
 @dataclass
 class AoiBuilder(L5xElementBuilder):
+    def _routines(self) -> List[Routine]:
+        routines: List[Routine] = []
+        self._cur.execute(
+            "SELECT object_id FROM comps WHERE parent_id=? AND comp_name='RxRoutineCollection'",
+            (self._object_id,),
+        )
+        routine_coll_row = self._cur.fetchone()
+        if routine_coll_row:
+            self._cur.execute(
+                "SELECT object_id FROM comps WHERE parent_id=?", (routine_coll_row[0],)
+            )
+            for (child_oid,) in self._cur.fetchall():
+                try:
+                    routines.append(RoutineBuilder(self._cur, child_oid, _notes=self._notes).build())
+                except Exception:
+                    pass
+        return routines
+
+    def _build_protected(self, name: str) -> AOI:
+        # Only the name, the description (via the backing data type) and the
+        # routine names and types are stored readably. Revision, vendor,
+        # dates, help text and the parameter/local-tag split are encrypted,
+        # so they are left out rather than guessed.
+        self._notes.warn(
+            f"Add-On Instruction '{name}' is source-protected: its revision, vendor, "
+            "dates, help text, parameters and local tags are encrypted and were left "
+            "out; only its name, description and routine names were exported"
+        )
+        return AOI(
+            name, name, None, None, None,
+            None, None, None,
+            None, None, None, None, None,
+            None, None, self._routines(),
+            _aoi_data_type_description(self._cur, name),
+            "",
+        )
+
     def build(self) -> AOI:
         self._cur.execute(
             "SELECT comp_name, object_id, parent_id, record FROM comps WHERE object_id="
@@ -2528,18 +2645,20 @@ class AoiBuilder(L5xElementBuilder):
 
         aoi_record = bytes(results[0][3])
         name = results[0][0]
+        try:
+            _r_aoi = RxGeneric.from_bytes(aoi_record, allow_protected=True)
+        except Exception:
+            _r_aoi = None
+        if _r_aoi is not None and _r_aoi.protected:
+            return self._build_protected(name)
 
         # --- Revision (major.minor) from ext[0x01] ---
-        _r_aoi: Union[RxGeneric, None] = None
-        try:
-            r = RxGeneric.from_bytes(aoi_record)
-            _r_aoi = r
-            exts: Dict[int, bytes] = {e.attribute_id: bytes(e.value) for e in r.extended_records}
+        rev_major, rev_minor = 1, 0
+        if _r_aoi is not None:
+            exts: Dict[int, bytes] = {e.attribute_id: bytes(e.value) for e in _r_aoi.extended_records}
             e01 = exts.get(0x01, b"")
             rev_major = struct.unpack_from("<H", e01, 0x1A)[0] if len(e01) > 0x1B else 1
             rev_minor = struct.unpack_from("<H", e01, 0x1C)[0] if len(e01) > 0x1D else 0
-        except Exception:
-            rev_major, rev_minor = 1, 0
         revision = f"{rev_major}.{rev_minor}"
 
         # --- Vendor from comps record ---
@@ -2560,7 +2679,6 @@ class AoiBuilder(L5xElementBuilder):
 
         parameters: List[Parameter] = []
         local_tags: List[LocalTag] = []
-        routines: List[Routine] = []
 
         # --- Extract Parameters and LocalTags from RxTagCollection ---
         self._cur.execute(
@@ -2596,32 +2714,16 @@ class AoiBuilder(L5xElementBuilder):
 
                 if is_param:
                     try:
-                        parameters.append(ParameterBuilder(self._cur, child_oid).build())
+                        parameters.append(ParameterBuilder(self._cur, child_oid, _notes=self._notes).build())
                     except Exception:
                         pass
                 else:
                     try:
-                        local_tags.append(LocalTagBuilder(self._cur, child_oid).build())
+                        local_tags.append(LocalTagBuilder(self._cur, child_oid, _notes=self._notes).build())
                     except Exception:
                         pass
 
-        # --- Extract Routines from RxRoutineCollection ---
-        self._cur.execute(
-            "SELECT object_id FROM comps WHERE parent_id="
-            + str(self._object_id)
-            + " AND comp_name='RxRoutineCollection'"
-        )
-        routine_coll_row = self._cur.fetchone()
-        if routine_coll_row:
-            routine_coll_oid = routine_coll_row[0]
-            self._cur.execute(
-                "SELECT object_id FROM comps WHERE parent_id=" + str(routine_coll_oid)
-            )
-            for (child_oid,) in self._cur.fetchall():
-                try:
-                    routines.append(RoutineBuilder(self._cur, child_oid).build())
-                except Exception:
-                    pass
+        routines = self._routines()
 
         # --- Description + RevisionNote ---
         aoi_description: Union[str, None] = None
@@ -2722,7 +2824,7 @@ class ProgramBuilder(L5xElementBuilder):
 
         routines = []
         for child in routine_results:
-            routines.append(RoutineBuilder(self._cur, child[1]).build())
+            routines.append(RoutineBuilder(self._cur, child[1], _notes=self._notes).build())
 
         # Get the Program Scoped Tags
         tag_collection_id = _required_program_collection(
@@ -2740,7 +2842,7 @@ class ProgramBuilder(L5xElementBuilder):
         results = self._cur.fetchall()
         tags: List[Tag] = []
         for result in results:
-            tag = TagBuilder(self._cur, result[1]).build()
+            tag = TagBuilder(self._cur, result[1], _notes=self._notes).build()
             tag._data_types_map = self._data_types_map
             tags.append(tag)
 
@@ -2981,7 +3083,7 @@ class ControllerBuilder(L5xElementBuilder):
         all_data_types_map: Dict[str, DataType] = {}
         for result in results:
             _data_type_object_id = result[1]
-            dt = DataTypeBuilder(self._cur, _data_type_object_id).build()
+            dt = DataTypeBuilder(self._cur, _data_type_object_id, _notes=self._notes).build()
             all_data_types_map[dt.name.upper()] = dt
             if dt.cls == "User":
                 data_types.append(dt)
@@ -3017,13 +3119,11 @@ class ControllerBuilder(L5xElementBuilder):
             _tag_object_id = result[1]
             tag_name = result[0]
             try:
-                tag = TagBuilder(self._cur, _tag_object_id).build()
+                tag = TagBuilder(self._cur, _tag_object_id, _notes=self._notes).build()
             except ValueError as exc:
-                log.warning(
-                    "Skipping controller tag {} (object {}): {}",
-                    tag_name,
-                    _tag_object_id,
-                    exc,
+                self._notes.warn(
+                    f"Tag '{tag_name}' could not be read and was left out",
+                    f"object {_tag_object_id}: {exc}",
                 )
                 skipped_tags.append(
                     {
@@ -3058,7 +3158,13 @@ class ControllerBuilder(L5xElementBuilder):
         for result in program_records:
             _program_object_id = result[1]
             programs.append(
-                ProgramBuilder(self._cur, _program_object_id, data_types_map, redundancy_enabled).build()
+                ProgramBuilder(
+                    self._cur,
+                    _program_object_id,
+                    _data_types_map=data_types_map,
+                    _redundancy_enabled=redundancy_enabled,
+                    _notes=self._notes,
+                ).build()
             )
 
         # Build task schedule ID → program name map. Legacy projects keep this
@@ -3087,14 +3193,14 @@ class ControllerBuilder(L5xElementBuilder):
                 + " AND record_type=256"
             )
             for task_result in self._cur.fetchall():
-                tasks.append(TaskBuilder(self._cur, task_result[1]).build(comment_id_to_program))
+                tasks.append(TaskBuilder(self._cur, task_result[1], _notes=self._notes).build(comment_id_to_program))
 
         # Get the AOI Collection and get the AOIs
         results = _get_aoi_records(self._cur, self._object_id)
         aois: List[AOI] = []
         for result in results:
             _aoi_object_id = result[1]
-            aois.append(AoiBuilder(self._cur, _aoi_object_id).build())
+            aois.append(AoiBuilder(self._cur, _aoi_object_id, _notes=self._notes).build())
 
         # Get the Module (IO) Collection and build all Module elements.
         self._cur.execute(
@@ -3135,8 +3241,10 @@ class ControllerBuilder(L5xElementBuilder):
             for _, mod_oid, _ in mod_rows:
                 modules.append(
                     ModuleBuilder(
-                        self._cur, mod_oid, modid_to_name,
+                        self._cur, mod_oid,
+                        _modid_to_name=modid_to_name,
                         _catalog_table=self._catalog_table,
+                        _notes=self._notes,
                     ).build()
                 )
 
@@ -3341,4 +3449,6 @@ class DumpCompsRecords(L5xElementBuilder):
                 )
                 file.write(record)
 
-            DumpCompsRecords(self._cur, object_id, new_path).dump(object_id, log_file)
+            DumpCompsRecords(
+                self._cur, object_id, base_directory=new_path, _notes=self._notes
+            ).dump(object_id, log_file)

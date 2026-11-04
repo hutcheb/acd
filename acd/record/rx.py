@@ -4,6 +4,12 @@ from typing import List
 
 from acd.generated.comps.rx_generic import RxGeneric as GeneratedRxGeneric
 
+# Source protection stores a record's attribute block as an encrypted
+# envelope. The envelope starts with this u32 where a plain record has its
+# attribute count (offset 78, right after the 60-byte main record and the
+# length field); the main record before it stays readable.
+ENCRYPTED_ENVELOPE_MAGIC = 0x0AAA96AA
+
 
 @dataclass
 class LegacyAttributeRecord:
@@ -42,6 +48,9 @@ class LegacyMainRecord:
 
 
 class LegacyRxGeneric:
+    # Legacy records are never source-protected.
+    protected = False
+
     def __init__(self, raw: bytes):
         self.is_legacy = True
         self.data_instance_id, self.unique_tag_identifier = struct.unpack_from(
@@ -102,15 +111,39 @@ class LegacyRxGeneric:
         return metadata[2 : 2 + length].decode("utf-8", errors="replace")
 
 
+class CurrentRxGeneric(GeneratedRxGeneric):
+    """The current-layout Rx record, read by the generated parser."""
+
+    # True for a source-protected record: only the header and main record
+    # are readable, and extended_records is empty.
+    protected = False
+
+
 class RxGeneric:
     @staticmethod
-    def from_bytes(raw: bytes):
+    def from_bytes(raw: bytes, allow_protected: bool = False):
+        """Parse an Rx record of either layout.
+
+        A source-protected record raises ValueError unless `allow_protected`
+        is set; then it parses to its header and main record only, with
+        `protected` set.
+        """
         raw = bytes(raw)
-        if len(raw) >= 82 and struct.unpack_from("<I", raw, 74)[0] == len(raw) - 74:
-            return GeneratedRxGeneric.from_bytes(raw)
+        if len(raw) >= 82:
+            stored_length, count = struct.unpack_from("<II", raw, 74)
+            if count == ENCRYPTED_ENVELOPE_MAGIC:
+                if not allow_protected:
+                    raise ValueError("Rx record is source-protected (encrypted)")
+                # Read the header and main record only (as a record with no
+                # attributes); the attributes are encrypted.
+                parsed = CurrentRxGeneric.from_bytes(raw[:78] + bytes(4))
+                parsed.protected = True
+                return parsed
+            if stored_length == len(raw) - 74:
+                return CurrentRxGeneric.from_bytes(raw)
         if len(raw) >= 32 and struct.unpack_from("<I", raw, 24)[0] in (
             len(raw) - 28,
             len(raw) - 24,
         ):
             return LegacyRxGeneric(raw)
-        return GeneratedRxGeneric.from_bytes(raw)
+        return CurrentRxGeneric.from_bytes(raw)
