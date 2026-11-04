@@ -189,17 +189,8 @@ def test_region_map_0x4e_guess_is_noted():
                 "be any of 2 rungs; that rung will be missing from the export"
             ],
         ),
-        # No unclaimed rung fits the gap.
-        (
-            [10],
-            [(10, 5, 0, 1)],
-            [(5, 0, 2)],
-            [
-                "Routine 'MainRoutine': a truncated Region Map entry (seq 2) could "
-                "not be matched to any unclaimed rung, so no rung is known to be "
-                "missing"
-            ],
-        ),
+        # No unclaimed rung fits the gap, so no rung is missing and nothing is noted.
+        ([10], [(10, 5, 0, 1)], [(5, 0, 2)], []),
     ],
 )
 def test_truncated_region_map_entry_notes(

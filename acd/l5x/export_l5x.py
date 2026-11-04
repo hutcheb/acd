@@ -337,11 +337,11 @@ class ExportL5x:
             routine = self._id_to_name.get(parent_id)
             routine_label = f"'{routine}'" if routine else str(parent_id)
             if n_candidates == 0:
-                # No unclaimed rung fits this gap, so no rung is known to be missing.
-                self._notes.warn(
+                # No unclaimed rung fits this gap, so no rung is missing; nothing
+                # was skipped or guessed, so this is logged but not noted.
+                log.info(
                     f"Routine {routine_label}: a truncated Region Map entry (seq {seq}) "
-                    "could not be matched to any unclaimed rung, so no rung is known "
-                    "to be missing"
+                    "matches no unclaimed rung; no rung is missing"
                 )
             else:
                 self._notes.warn(
