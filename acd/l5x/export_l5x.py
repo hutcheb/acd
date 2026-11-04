@@ -174,11 +174,21 @@ class ExportL5x:
         # with no lines, each with a warning.
         self._cur.execute("CREATE TABLE st_lines(routine_id int, line_number int, text text)")
         try:
+            decoder = self.st_decoder()
+            routines = decoder.all_routines()
             st_tuples = [
                 (comps_id, number, text)
-                for _name, comps_id, lines in self.st_decoder().all_routines()
+                for _name, comps_id, lines in routines
                 for number, text in enumerate(lines)
             ]
+            for name, comps_id, _lines in routines:
+                unreadable = decoder.unreadable_lines.get(comps_id)
+                if unreadable:
+                    self._notes.warn_grouped(
+                        "Structured Text routines with lines that could not be "
+                        "decoded and were left out",
+                        f"{name} ({unreadable})",
+                    )
             self._cur.executemany("INSERT INTO st_lines VALUES (?,?,?)", st_tuples)
             self._db.commit()
         except Exception as exc:
