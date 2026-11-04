@@ -1,9 +1,11 @@
 import argparse
 import os
+import shutil
 import sqlite3
 import struct
 import tempfile
-from dataclasses import dataclass, field
+import weakref
+from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Cursor
 from typing import Dict, List, Tuple, Union
@@ -25,17 +27,21 @@ from acd.record.nameless import NamelessRecord
 from acd.record.sbregion import SbRegionRecord
 
 
+def _remove_temp_dir(connections: List[sqlite3.Connection], path: str) -> None:
+    # An open connection keeps acd.db locked on Windows, so close it first.
+    for connection in connections:
+        connection.close()
+    shutil.rmtree(path, True)
+
+
 @dataclass
 class ExportL5x:
     input_filename: os.PathLike
-    # Default to a unique temp dir per ExportL5x instance. The original default
-    # was the shared relative dir "build", which made concurrent/parallel test
-    # runs collide on build/acd.db (Windows locks the SQLite file while a
-    # connection is open, so a second run's os.remove in __post_init__ fails).
-    # tempfile.mkdtemp() was the documented intent (see the original comment);
-    # each instance now gets its own dir so runs are isolated. Pass a specific
-    # dir (e.g. "build") to restore the old behaviour for manual inspection.
-    _temp_dir: str = field(default_factory=lambda: tempfile.mkdtemp(prefix="acd-build-"))
+    # Directory for the extracted files and SQLite database. None (default)
+    # creates a unique temp dir per instance, removed when the instance is
+    # garbage-collected or the interpreter exits, even after an error. Pass a
+    # specific dir (e.g. "build") to keep the files for inspection.
+    _temp_dir: Union[str, None] = None
     _controller: Union[Controller, None] = None
     _project: Union[RSLogix5000Content, None] = None
     # Optional richer catalog (CIP identity -> catalog number) used to resolve
@@ -47,6 +53,25 @@ class ExportL5x:
     _catalog_table: Union[Dict[Tuple[int, int, int], str], None] = None
 
     def __post_init__(self):
+        self._connections: List[sqlite3.Connection] = []
+        if self._temp_dir is None:
+            self._temp_dir = tempfile.mkdtemp(prefix="acd-build-")
+            weakref.finalize(self, _remove_temp_dir, self._connections, self._temp_dir)
+        try:
+            self._build_database()
+        except BaseException:
+            # An open connection keeps acd.db locked on Windows, which makes
+            # removing the temp directory fail.
+            self._close_db()
+            raise
+
+    def _close_db(self) -> None:
+        """Close the SQLite connection, if one was opened."""
+        db = getattr(self, "_db", None)
+        if db is not None:
+            db.close()
+
+    def _build_database(self):
         log.info(
             "Creating temporary directory (if it doesn't exist to store ACD database files - "
             + self._temp_dir
@@ -60,6 +85,7 @@ class ExportL5x:
         self._db = sqlite3.connect(
             os.path.join(self._temp_dir, _DEFAULT_SQL_DATABASE_NAME)
         )
+        self._connections.append(self._db)
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute("PRAGMA synchronous=OFF")
         self._cur: Cursor = self._db.cursor()
@@ -179,9 +205,13 @@ class ExportL5x:
     @property
     def controller(self):
         if self._controller is None:
-            self._controller = ControllerBuilder(
-                self._cur, _catalog_table=self._catalog_table
-            ).build()
+            try:
+                self._controller = ControllerBuilder(
+                    self._cur, _catalog_table=self._catalog_table
+                ).build()
+            except BaseException:
+                self._close_db()
+                raise
         return self._controller
 
     def st_decoder(self) -> "STDecoder": # noqa
@@ -207,9 +237,13 @@ class ExportL5x:
     @property
     def project(self):
         if self._project is None:
-            self._project = ProjectBuilder(
-                Path(os.path.join(self._temp_dir, "QuickInfo.XML"))
-            ).build()
+            try:
+                self._project = ProjectBuilder(
+                    Path(os.path.join(self._temp_dir, "QuickInfo.XML"))
+                ).build()
+            except BaseException:
+                self._close_db()
+                raise
             self._project.controller = self.controller
             self._project._raw_files = self._raw_files
             self._project._file_order = self._file_order
