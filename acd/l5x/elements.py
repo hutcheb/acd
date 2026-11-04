@@ -14,6 +14,7 @@ from typing import List, Tuple, Dict, Union
 from loguru import logger as log
 
 from acd.l5x.catalog_numbers import CATALOG_NUMBERS, catalog_number_for_identity
+from acd.l5x.conversion_notes import ConversionNotes, xml_comment
 from acd.l5x.port_structures import PORT_STRUCTURES
 from acd.record.rx import LegacyRxGeneric, RxGeneric
 
@@ -37,6 +38,16 @@ def _escape_xml_attr(value: object) -> str:
     text = _XML_ILLEGAL_RE.sub("", str(value))
     text = html.escape(text, quote=True)
     return text.replace("\t", "&#x9;").replace("\r", "&#xD;").replace("\n", "&#xA;")
+
+
+def _cdata_section(text: str) -> str:
+    """Wrap text in a CDATA section, stripping XML-illegal characters.
+
+    A CDATA section cannot contain ``]]>``, so that sequence is split across
+    two sections (``]]]]><![CDATA[>``), which is how Rockwell escapes it.
+    """
+    text = _XML_ILLEGAL_RE.sub("", text).replace("]]>", "]]]]><![CDATA[>")
+    return f"<![CDATA[{text}]]>"
 
 
 # Characters that are illegal in Windows (and some other) filesystem names.
@@ -75,6 +86,8 @@ def _sanitize_path_component(name: str) -> str:
 class L5xElementBuilder:
     _cur: Cursor
     _object_id: int = -1
+    # Notes for this conversion, shared by every builder in it. Pass it by keyword.
+    _notes: ConversionNotes = field(default_factory=ConversionNotes)
 
 
 def _get_program_records(cur: Cursor, collection_id: int) -> List[Tuple[str, int, int, bytes]]:
@@ -903,9 +916,11 @@ class Routine(L5xElement):
     rungs: List[str]
     _rung_ids: List[int] = field(default_factory=list)
     _rung_comments: Dict[int, str] = field(default_factory=dict)
+    _st_lines: List[str] = field(default_factory=list)
 
     def to_xml(self) -> str:
         rll_content = ""
+        st_content = ""
         if self.type == "RLL" and self.rungs:
             rung_xmls = []
             for i, rung_text in enumerate(self.rungs):
@@ -924,7 +939,14 @@ class Routine(L5xElement):
                 )
             if rung_xmls:
                 rll_content = f'<RLLContent>{"".join(rung_xmls)}</RLLContent>'
-        return f'<Routine Name="{_escape_xml_attr(self.name)}" Type="{self.type}">{rll_content}</Routine>'
+        if self.type == "ST" and self._st_lines:
+            # Blank lines are kept: the line number is the position in the source.
+            line_xmls = [
+                f'<Line Number="{i}">{_cdata_section(text)}</Line>'
+                for i, text in enumerate(self._st_lines)
+            ]
+            st_content = f'<STContent>{"".join(line_xmls)}</STContent>'
+        return f'<Routine Name="{_escape_xml_attr(self.name)}" Type="{self.type}">{rll_content}{st_content}</Routine>'
 
 
 @dataclass
@@ -1145,10 +1167,18 @@ class RSLogix5000Content(L5xElement):
     contains_context: str
     export_date: str
     export_options: str
+    # Fallbacks taken during the conversion, written as an XML comment at the
+    # top of the file. Empty means no comment.
+    conversion_notes: List[str] = field(default_factory=list)
 
     def __post_init__(self):
         super().__post_init__()
         self._export_name = "RSLogix5000Content"
+
+    def to_xml(self) -> str:
+        # The comment comes before the root element, so it lands right after
+        # the XML declaration that the caller writes first.
+        return xml_comment(self.conversion_notes) + super().to_xml()
 
 
 def radix_enum(i: int) -> str:
@@ -1400,9 +1430,11 @@ class DataTypeBuilder(L5xElementBuilder):
                 try:
                     children.append(
                         MemberBuilder(
-                            self._cur, child[1], bytes(extended_records[key]),
-                            offset60_to_name,
-                            last_hidden_backing,
+                            self._cur, child[1],
+                            record=bytes(extended_records[key]),
+                            _offset60_to_name=offset60_to_name,
+                            _fallback_target=last_hidden_backing,
+                            _notes=self._notes,
                         ).build()
                     )
                 except Exception:
@@ -2078,10 +2110,10 @@ class TagBuilder(L5xElementBuilder):
                 # produce/consume descriptor from in that case, so fall back
                 # to exporting this as a plain Base tag rather than failing
                 # the whole project's export over one tag's connection info.
-                log.warning(
-                    f"Tag '{name}': couldn't build its {tag_type.lower()} "
-                    f"connection info ({e}) -- exporting it as a Base tag "
-                    "instead"
+                self._notes.warn(
+                    f"Tag '{name}': {tag_type.lower()} connection info could not "
+                    "be read; exported as a Base tag",
+                    str(e),
                 )
                 tag_type = "Base"
                 produce_info = None
@@ -2437,8 +2469,26 @@ class RoutineBuilder(L5xElementBuilder):
         # of silently dropped (Routine.to_xml only serialises rungs for RLL).
         if routine_type == "TypeLess" and rungs:
             routine_type = "RLL"
+            self._notes.warn_grouped(
+                "Routines with no readable type but with ladder rungs, "
+                "exported as RLL",
+                name,
+            )
 
-        return Routine(name, name, routine_type, rungs, rung_ids, rung_comments)
+        st_lines: List[str] = []
+        if routine_type == "ST":
+            self._cur.execute(
+                "SELECT text FROM st_lines WHERE routine_id=? ORDER BY line_number",
+                (self._object_id,),
+            )
+            st_lines = [row[0] for row in self._cur.fetchall()]
+            if not st_lines:
+                self._notes.warn_grouped(
+                    "Structured Text routines with no decoded lines, exported empty",
+                    name,
+                )
+
+        return Routine(name, name, routine_type, rungs, rung_ids, rung_comments, _st_lines=st_lines)
 
 
 def _parse_fffeff(data: bytes, offset: int):
@@ -2596,12 +2646,12 @@ class AoiBuilder(L5xElementBuilder):
 
                 if is_param:
                     try:
-                        parameters.append(ParameterBuilder(self._cur, child_oid).build())
+                        parameters.append(ParameterBuilder(self._cur, child_oid, _notes=self._notes).build())
                     except Exception:
                         pass
                 else:
                     try:
-                        local_tags.append(LocalTagBuilder(self._cur, child_oid).build())
+                        local_tags.append(LocalTagBuilder(self._cur, child_oid, _notes=self._notes).build())
                     except Exception:
                         pass
 
@@ -2619,7 +2669,7 @@ class AoiBuilder(L5xElementBuilder):
             )
             for (child_oid,) in self._cur.fetchall():
                 try:
-                    routines.append(RoutineBuilder(self._cur, child_oid).build())
+                    routines.append(RoutineBuilder(self._cur, child_oid, _notes=self._notes).build())
                 except Exception:
                     pass
 
@@ -2722,7 +2772,7 @@ class ProgramBuilder(L5xElementBuilder):
 
         routines = []
         for child in routine_results:
-            routines.append(RoutineBuilder(self._cur, child[1]).build())
+            routines.append(RoutineBuilder(self._cur, child[1], _notes=self._notes).build())
 
         # Get the Program Scoped Tags
         tag_collection_id = _required_program_collection(
@@ -2740,7 +2790,7 @@ class ProgramBuilder(L5xElementBuilder):
         results = self._cur.fetchall()
         tags: List[Tag] = []
         for result in results:
-            tag = TagBuilder(self._cur, result[1]).build()
+            tag = TagBuilder(self._cur, result[1], _notes=self._notes).build()
             tag._data_types_map = self._data_types_map
             tags.append(tag)
 
@@ -2981,7 +3031,7 @@ class ControllerBuilder(L5xElementBuilder):
         all_data_types_map: Dict[str, DataType] = {}
         for result in results:
             _data_type_object_id = result[1]
-            dt = DataTypeBuilder(self._cur, _data_type_object_id).build()
+            dt = DataTypeBuilder(self._cur, _data_type_object_id, _notes=self._notes).build()
             all_data_types_map[dt.name.upper()] = dt
             if dt.cls == "User":
                 data_types.append(dt)
@@ -3017,13 +3067,11 @@ class ControllerBuilder(L5xElementBuilder):
             _tag_object_id = result[1]
             tag_name = result[0]
             try:
-                tag = TagBuilder(self._cur, _tag_object_id).build()
+                tag = TagBuilder(self._cur, _tag_object_id, _notes=self._notes).build()
             except ValueError as exc:
-                log.warning(
-                    "Skipping controller tag {} (object {}): {}",
-                    tag_name,
-                    _tag_object_id,
-                    exc,
+                self._notes.warn(
+                    f"Tag '{tag_name}' could not be read and was left out",
+                    f"object {_tag_object_id}: {exc}",
                 )
                 skipped_tags.append(
                     {
@@ -3058,7 +3106,13 @@ class ControllerBuilder(L5xElementBuilder):
         for result in program_records:
             _program_object_id = result[1]
             programs.append(
-                ProgramBuilder(self._cur, _program_object_id, data_types_map, redundancy_enabled).build()
+                ProgramBuilder(
+                    self._cur,
+                    _program_object_id,
+                    _data_types_map=data_types_map,
+                    _redundancy_enabled=redundancy_enabled,
+                    _notes=self._notes,
+                ).build()
             )
 
         # Build task schedule ID → program name map. Legacy projects keep this
@@ -3087,14 +3141,14 @@ class ControllerBuilder(L5xElementBuilder):
                 + " AND record_type=256"
             )
             for task_result in self._cur.fetchall():
-                tasks.append(TaskBuilder(self._cur, task_result[1]).build(comment_id_to_program))
+                tasks.append(TaskBuilder(self._cur, task_result[1], _notes=self._notes).build(comment_id_to_program))
 
         # Get the AOI Collection and get the AOIs
         results = _get_aoi_records(self._cur, self._object_id)
         aois: List[AOI] = []
         for result in results:
             _aoi_object_id = result[1]
-            aois.append(AoiBuilder(self._cur, _aoi_object_id).build())
+            aois.append(AoiBuilder(self._cur, _aoi_object_id, _notes=self._notes).build())
 
         # Get the Module (IO) Collection and build all Module elements.
         self._cur.execute(
@@ -3135,8 +3189,10 @@ class ControllerBuilder(L5xElementBuilder):
             for _, mod_oid, _ in mod_rows:
                 modules.append(
                     ModuleBuilder(
-                        self._cur, mod_oid, modid_to_name,
+                        self._cur, mod_oid,
+                        _modid_to_name=modid_to_name,
                         _catalog_table=self._catalog_table,
+                        _notes=self._notes,
                     ).build()
                 )
 
@@ -3341,4 +3397,6 @@ class DumpCompsRecords(L5xElementBuilder):
                 )
                 file.write(record)
 
-            DumpCompsRecords(self._cur, object_id, new_path).dump(object_id, log_file)
+            DumpCompsRecords(
+                self._cur, object_id, base_directory=new_path, _notes=self._notes
+            ).dump(object_id, log_file)

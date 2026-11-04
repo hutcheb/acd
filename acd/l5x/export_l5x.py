@@ -6,13 +6,14 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from sqlite3 import Cursor
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 from acd.database.dbextract import DbExtract
 from acd.zip.unzip import Unzip
 from loguru import logger as log
 
 from acd.l5x.catalog_numbers import load_external_catalog
+from acd.l5x.conversion_notes import ConversionNotes
 from acd.l5x.elements import (
     Controller,
     ControllerBuilder,
@@ -47,6 +48,7 @@ class ExportL5x:
     _catalog_table: Union[Dict[Tuple[int, int, int], str], None] = None
 
     def __post_init__(self):
+        self._notes = ConversionNotes()
         log.info(
             "Creating temporary directory (if it doesn't exist to store ACD database files - "
             + self._temp_dir
@@ -167,6 +169,35 @@ class ExportL5x:
         self._cur.executemany("INSERT INTO nameless VALUES (?,?,?)", nameless_tuples)
         self._db.commit()
 
+        # Structured Text source lines, keyed by the routine's comps object_id.
+        # A decoding failure leaves the table empty; the routines then export
+        # with no lines, each with a warning.
+        self._cur.execute("CREATE TABLE st_lines(routine_id int, line_number int, text text)")
+        try:
+            decoder = self.st_decoder()
+            routines = decoder.all_routines()
+            st_tuples = [
+                (comps_id, number, text)
+                for _name, comps_id, lines in routines
+                for number, text in enumerate(lines)
+            ]
+            for name, comps_id, _lines in routines:
+                unreadable = decoder.unreadable_lines.get(comps_id)
+                if unreadable:
+                    self._notes.warn_grouped(
+                        "Structured Text routines with lines that could not be "
+                        "decoded and were left out",
+                        f"{name} ({unreadable})",
+                    )
+            self._cur.executemany("INSERT INTO st_lines VALUES (?,?,?)", st_tuples)
+            self._db.commit()
+        except Exception as exc:
+            self._notes.warn(
+                "Structured Text routine bodies could not be decoded; "
+                "ST routines were exported with no lines",
+                str(exc),
+            )
+
         log.info("Creating indexes for fast object graph queries")
         self._cur.execute("CREATE INDEX idx_comps_object_id ON comps(object_id)")
         self._cur.execute("CREATE INDEX idx_comps_parent_id ON comps(parent_id)")
@@ -174,13 +205,14 @@ class ExportL5x:
         self._cur.execute("CREATE INDEX idx_rungs_object_id ON rungs(object_id)")
         self._cur.execute("CREATE INDEX idx_region_map_parent_id ON region_map(parent_id)")
         self._cur.execute("CREATE INDEX idx_comments_parent ON comments(parent)")
+        self._cur.execute("CREATE INDEX idx_st_lines_routine_id ON st_lines(routine_id)")
         self._db.commit()
 
     @property
     def controller(self):
         if self._controller is None:
             self._controller = ControllerBuilder(
-                self._cur, _catalog_table=self._catalog_table
+                self._cur, _catalog_table=self._catalog_table, _notes=self._notes
             ).build()
         return self._controller
 
@@ -211,6 +243,7 @@ class ExportL5x:
                 Path(os.path.join(self._temp_dir, "QuickInfo.XML"))
             ).build()
             self._project.controller = self.controller
+            self._project.conversion_notes = self._notes.current()
             self._project._raw_files = self._raw_files
             self._project._file_order = self._file_order
             self._project._footer_unknown = self._footer_unknown
@@ -248,7 +281,9 @@ class ExportL5x:
         known_rung_ids = {row[0] for row in self._cur.fetchall()}
 
         complete_entries = []
-        for object_id, parent_id, unknown, seq, raw in self._parse_region_map(record, known_rung_ids):
+        for object_id, parent_id, unknown, seq, raw in self._parse_region_map(
+            record, known_rung_ids, notes=self._notes
+        ):
             if object_id is None:
                 self._pending_region_map_gaps.append((parent_id, unknown, seq))
             else:
@@ -329,11 +364,21 @@ class ExportL5x:
             self._cur.executemany("INSERT INTO region_map VALUES (?, ?, ?, ?, ?)", resolved)
             self._db.commit()
         for parent_id, unknown, seq, n_candidates in unresolved:
-            log.warning(
-                f"Could not recover truncated Region Map entry for routine {parent_id}, "
-                f"seq {seq} ({n_candidates} ambiguous candidates) -- that rung will be "
-                "missing from the export"
-            )
+            routine = self._id_to_name.get(parent_id)
+            routine_label = f"'{routine}'" if routine else str(parent_id)
+            if n_candidates == 0:
+                # No unclaimed rung fits this gap, so no rung is missing; nothing
+                # was skipped or guessed, so this is logged but not noted.
+                log.info(
+                    f"Routine {routine_label}: a truncated Region Map entry (seq {seq}) "
+                    "matches no unclaimed rung; no rung is missing"
+                )
+            else:
+                self._notes.warn(
+                    f"Routine {routine_label}: a truncated Region Map entry (seq {seq}) "
+                    f"could be any of {n_candidates} rungs; that rung will be missing "
+                    "from the export"
+                )
 
     @staticmethod
     def _find_region_map_alignment(record, known_rung_ids):
@@ -393,7 +438,9 @@ class ExportL5x:
         return None
 
     @staticmethod
-    def _parse_region_map(record, known_rung_ids=None):
+    def _parse_region_map(record, known_rung_ids=None, notes: Optional[ConversionNotes] = None):
+        if notes is None:
+            notes = ConversionNotes()
         # Current empty projects use a header-only Region Map without a length
         # field or entries.
         if len(record) == 0x4A:
@@ -443,12 +490,10 @@ class ExportL5x:
                     )
                 else:
                     identifier_offset = 0x4E
-                    log.warning(
-                        "Region Map record's stored length (0x4A) doesn't match "
-                        f"its on-disk size ({len(record)} bytes), and no better "
-                        "alignment could be confirmed against known rung "
-                        "object_ids -- falling back to the modern 0x4E offset, "
-                        "which may not be correct for this record"
+                    notes.warn(
+                        "Region Map: its stored length doesn't match its size "
+                        f"({len(record)} bytes) and entries could not be matched to "
+                        "known rungs; assumed the usual offset 0x4E, which may be wrong"
                     )
                 entries_length = len(record) - identifier_offset
                 allowed_trailer_lengths = range(16)

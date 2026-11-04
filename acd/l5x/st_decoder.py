@@ -67,6 +67,15 @@ def _decode_index_record(idx_rec: bytes, line_recs: dict[int, bytes],
                           name_lookup: dict) -> list[str]:
     """Resolve and order the line texts referenced by an index record.
 
+    See _decode_index_record_counted, which also counts unreadable lines.
+    """
+    return _decode_index_record_counted(idx_rec, line_recs, name_lookup)[0]
+
+
+def _decode_index_record_counted(idx_rec: bytes, line_recs: dict[int, bytes],
+                                 name_lookup: dict) -> tuple[list[str], int]:
+    """Resolve and order the line texts referenced by an index record.
+
     idx_rec layout:
       bytes  0-19: header (length, flags, parent_id, self oid, type constant)
       bytes 20-21: 2 padding/flag bytes
@@ -81,9 +90,11 @@ def _decode_index_record(idx_rec: bytes, line_recs: dict[int, bytes],
       these reference sub-group anchors or compiled-form records that are not
       direct children of this index record.
 
-    Returns a list of decoded strings (blank lines are preserved as '').
+    Returns the decoded strings (blank lines are preserved as '') and the
+    number of line records whose text could not be read and were left out.
     """
     out: list[str] = []
+    unreadable = 0
     seen: set[int] = set()
     off = 22
     while off + 4 <= len(idx_rec):
@@ -96,9 +107,11 @@ def _decode_index_record(idx_rec: bytes, line_recs: dict[int, bytes],
         if rec is None:
             continue  # references a sub-group anchor or out-of-scope record
         text = _decode_line_text(rec, name_lookup)
-        if text is not None:
+        if text is None:
+            unreadable += 1
+        else:
             out.append(text)
-    return out
+    return out, unreadable
 
 
 # ── Core decoder ─────────────────────────────────────────────────────────────
@@ -143,6 +156,9 @@ class STDecoder:
 
         # Cache: comps_id → ordered lines (populated lazily)
         self._cache: dict[int, Optional[list[str]]] = {}
+        # comps_id → number of line records left out because their text could
+        # not be read (only routines with at least one such line).
+        self.unreadable_lines: dict[int, int] = {}
 
     # ── Public ───────────────────────────────────────────────────────────────
 
@@ -164,7 +180,7 @@ class STDecoder:
             comps_id = desc_pid
             if comps_id in seen_comps:
                 continue
-            lines = self._decode_from_desc(desc_oid)
+            lines = self._decode_from_desc(desc_oid, comps_id)
             if lines is not None:
                 seen_comps.add(comps_id)
                 name = self._name_lookup.get(comps_id, f"<{comps_id}>")
@@ -185,7 +201,7 @@ class STDecoder:
         for desc_oid in self._children.get(comps_id, []):
             if desc_oid not in self._oid_to_rec:
                 continue
-            lines = self._decode_from_desc(desc_oid)
+            lines = self._decode_from_desc(desc_oid, comps_id)
             if lines is not None:
                 self._cache[comps_id] = lines
                 return lines
@@ -195,9 +211,13 @@ class STDecoder:
 
     # ── Private ──────────────────────────────────────────────────────────────
 
-    def _decode_from_desc(self, desc_oid: int) -> Optional[list[str]]:
-        """Walk aspects → index records under desc_oid; return the best decoded lines."""
+    def _decode_from_desc(self, desc_oid: int, comps_id: int) -> Optional[list[str]]:
+        """Walk aspects → index records under desc_oid; return the best decoded lines.
+
+        Records in unreadable_lines how many lines the chosen index record left out.
+        """
         best: Optional[list[str]] = None
+        best_unreadable = 0
 
         for asp_oid in self._children.get(desc_oid, []):
             for child_oid in self._children.get(asp_oid, []):
@@ -210,8 +230,12 @@ class STDecoder:
                     for gc in self._children.get(child_oid, [])
                     if gc in self._oid_to_rec
                 }
-                decoded = _decode_index_record(idx_rec, line_recs, self._name_lookup)
+                decoded, unreadable = _decode_index_record_counted(
+                    idx_rec, line_recs, self._name_lookup
+                )
                 if decoded and (best is None or len(decoded) > len(best)):
-                    best = decoded
+                    best, best_unreadable = decoded, unreadable
 
+        if best and best_unreadable:
+            self.unreadable_lines[comps_id] = best_unreadable
         return best if best else None
