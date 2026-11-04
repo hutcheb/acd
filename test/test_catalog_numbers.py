@@ -72,7 +72,7 @@ def test_builtin_table_invariants():
     # the table is the documented size. (Note: two distinct triples may share
     # a catalog value -- e.g. firmware variants of the same device -- which is
     # legitimate and NOT flagged here.)
-    assert len(CATALOG_NUMBERS) == 41, "built-in table size changed: %d" % len(CATALOG_NUMBERS)
+    assert len(CATALOG_NUMBERS) == 53, "built-in table size changed: %d" % len(CATALOG_NUMBERS)
     for key, value in CATALOG_NUMBERS.items():
         assert isinstance(key, tuple) and len(key) == 3, "key must be a 3-tuple: %r" % (key,)
         for component in key:
