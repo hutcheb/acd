@@ -1177,7 +1177,11 @@ def radix_enum(i: int) -> str:
     if i == 11:
         return "Date/Time (ns)"
     if i == 12:
-        return "UseTypeStyle"
+        return "Time32 (us)"
+    if i == 13:
+        return "Time (us)"
+    if i == 14:
+        return "LTime (ns)"
     return "General"
 
 
