@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from sqlite3 import Cursor
 from typing import Dict, Optional
 
+from loguru import logger as log
+
 from acd.database.dbextract import DatRecord
 
 from acd.generated.sbregion.fafa_sbregions import FafaSbregions
@@ -49,7 +51,18 @@ class SbRegionRecord:
         r = FafaSbregions.from_bytes(dat_record.record.record_buffer)
         if r.header.language_type not in ("Rung NT", "REGION NT"):
             return None
-        text = r.record_buffer.decode("utf-16-le").rstrip("\x00")
+        try:
+            text = r.record_buffer.decode("utf-16-le").rstrip("\x00")
+        except UnicodeDecodeError:
+            # Source-protected routines (e.g. AOIs with source protection
+            # enabled) store encrypted bytes here rather than UTF-16 text.
+            # Skip the record so the rest of the project still converts.
+            log.warning(
+                f"Skipping SbRegion record {r.header.identifier} "
+                f"({r.header.language_type}): content is not UTF-16 text, "
+                f"routine is likely source protected"
+            )
+            return None
         for tag in re.findall("@[A-Za-z0-9]*@", text):
             tag_id = int(tag[1:-1], 16)
             name = name_lookup.get(tag_id)
