@@ -72,7 +72,7 @@ def test_builtin_table_invariants():
     # the table is the documented size. (Note: two distinct triples may share
     # a catalog value -- e.g. firmware variants of the same device -- which is
     # legitimate and NOT flagged here.)
-    assert len(CATALOG_NUMBERS) == 41, "built-in table size changed: %d" % len(CATALOG_NUMBERS)
+    assert len(CATALOG_NUMBERS) == 42, "built-in table size changed: %d" % len(CATALOG_NUMBERS)
     for key, value in CATALOG_NUMBERS.items():
         assert isinstance(key, tuple) and len(key) == 3, "key must be a 3-tuple: %r" % (key,)
         for component in key:
@@ -84,3 +84,12 @@ def test_builtin_table_invariants():
     assert CATALOG_NUMBERS.get((1, 14, 165)) == "1756-L82E", "real L82E identity missing"
     assert CATALOG_NUMBERS.get((1, 14, 164)) == "1756-L81E", "real L81E identity missing"
 
+
+
+def test_controllogix_l7x_ids_resolve_natively():
+    # Product codes 92/93/94 are the 1756-L71/L72/L73. 92 was confirmed from a
+    # V37.11 project whose QuickInfo DeviceIdentity has ProductCode="92" and
+    # whose Studio 5000 L5X export says ProcessorType="1756-L71".
+    assert catalog_number_for_identity((1, 14, 92)) == "1756-L71"
+    assert catalog_number_for_identity((1, 14, 93)) == "1756-L72"
+    assert catalog_number_for_identity((1, 14, 94)) == "1756-L73"
