@@ -98,6 +98,12 @@ class CompsRecord:
 
         if dat_record.identifier == 64250:
             r = FafaComps.from_bytes(raw)
+            # Preserve the generic FAFA parser's contract. Only a complete,
+            # independently bounded typed Rx record can expose more source data.
+            from acd.record.attribute_bounds import complete_attributes
+            bounded = complete_attributes(raw[148:])
+            if bounded is not None:
+                r.record_buffer = raw[148:148 + bounded[0]]
         elif dat_record.identifier == 65021:
             r = FdfdComps(
                 dat_record.len_record,
