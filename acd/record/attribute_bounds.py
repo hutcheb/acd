@@ -28,4 +28,8 @@ def complete_attributes(raw):
         position = end
     if position not in (declared + 74, declared + 78):
         return None
+    if len(raw) - position not in (0, 4):
+        return None
+    if len({key for key, value in attrs}) != len(attrs):
+        raise ValueError('Duplicate counted Rx attribute identity')
     return position, attrs
