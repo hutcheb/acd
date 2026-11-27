@@ -7,7 +7,7 @@ the payload end. An opaque FAFA record is deliberately outside this contract.
 import struct
 
 
-COUNTED_TYPES = {0x68, 0x69, 0x6A, 0x6B, 0x6C}
+COUNTED_TYPES = {0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x338}
 
 
 def complete_attributes(raw):

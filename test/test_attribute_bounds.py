@@ -45,3 +45,11 @@ def test_counted_end_not_outer_size_defines_payload():
     raw = rx(b'12345678')
     assert complete_attributes(raw+b'TAIL')[0] == len(raw)
     assert complete_attributes(raw[:-4]) is None
+
+
+def test_aoi_declaration_final_alias_attribute_is_retained():
+    raw = bytearray(rx('@12345678@.0'.encode('utf-16-le')))
+    struct.pack_into('<H', raw, 10, 0x338)
+    struct.pack_into('<I', raw, 82, 0x65)
+    parsed = RxGeneric.from_bytes(raw)
+    assert [(a.attribute_id, a.value) for a in parsed.extended_records] == [(0x65, '@12345678@.0'.encode('utf-16-le'))]
