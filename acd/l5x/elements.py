@@ -2895,10 +2895,11 @@ class ControllerBuilder(L5xElementBuilder):
         # CommPath prefix (key 0x06A): may be in kaitai extended_records (usually empty),
         # or in the LastAttributeRecord appended after the counted records (value length
         # is stored as len_value where actual data = len_value - 4 bytes, UTF-16-LE).
+        from acd.l5x.comm_path import decode_comm_path
         _comm_path_prefix: Union[str, None] = None
         if 0x06A in extended_records:
             _cp_raw = extended_records[0x06A]
-            _cp_str = _cp_raw.decode("utf-16-le", errors="replace").rstrip("\x00")
+            _cp_str = decode_comm_path(_cp_raw)
             if _cp_str:
                 _comm_path_prefix = _cp_str
         else:
@@ -2918,7 +2919,7 @@ class ControllerBuilder(L5xElementBuilder):
                     _actual_len = _last_len_value - 4
                     if len(_tail) >= 8 + _actual_len and _actual_len > 0:
                         _cp_val = _tail[8: 8 + _actual_len]
-                        _cp_str = _cp_val.decode("utf-16-le", errors="replace").rstrip("\x00")
+                        _cp_str = decode_comm_path(_cp_val)
                         if _cp_str:
                             _comm_path_prefix = _cp_str
 
