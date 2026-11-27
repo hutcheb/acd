@@ -333,7 +333,16 @@ class ConvertAcdToL5x(Extract):
     # built-in only (default, unchanged). See _resolve_catalog_table.
     catalog_file: Union[PathLike, Dict[Tuple[int, int, int], str], None] = None
 
+    # Explicit input contract; available byte counts cannot establish it.
+    # None inherits the caller context, whose default is upstream-compatible.
+    rx_attribute_layout: Union[str, None] = None
+
     def extract(self):
+        from acd.record.attribute_bounds import attribute_layout
+        with attribute_layout(self.rx_attribute_layout):
+            return self._extract()
+
+    def _extract(self):
         project = ImportProjectFromFile(
             self.acd_filename, catalog_file=self.catalog_file
         ).import_project()
