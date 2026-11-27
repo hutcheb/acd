@@ -5,6 +5,13 @@ from acd.generated.dat import Dat
 from acd.record.attribute_bounds import complete_attributes
 from acd.record.comps import CompsRecord
 from acd.record.rx import RxGeneric
+from acd.record.attribute_bounds import attribute_layout
+
+
+@pytest.fixture(autouse=True)
+def explicit_counted_input_contract():
+    with attribute_layout('complete-counted'):
+        yield
 
 
 def rx(value):
@@ -57,6 +64,25 @@ def test_aoi_declaration_final_alias_attribute_is_retained():
 
 def test_arbitrary_trailing_data_is_outside_the_supported_contract():
     assert complete_attributes(rx(b'12345678') + b'TRAILER!') is None
+
+
+def test_inflated_final_attribute_and_outer_trailer_cannot_be_autodetected():
+    payload = bytearray(rx(b'12345678')[:-4])
+    struct.pack_into('<I', payload, 74, len(payload)-74)
+    body = bytearray(148) + payload
+    struct.pack_into('<I', body, 0, len(body))
+    struct.pack_into('<HHII', body, 8, 0, 256, 0, 1)
+    body[24:28] = b'X\0\0\0'
+    body.extend(b'JUNK')
+    framed = struct.pack('<HI', 0xfafa, len(body)+6) + body
+    dat = struct.pack('<6I',0,0,23+len(framed),24,0,1) + framed
+    record = Dat.from_bytes(dat).records.record[0]
+    with attribute_layout('compat'):
+        assert CompsRecord.parse(record)[5] == payload
+    # The identical bytes admit another interpretation. Only a caller that
+    # independently established complete counted attributes may select it.
+    with attribute_layout('complete-counted'):
+        assert CompsRecord.parse(record)[5] == payload + b'JUNK'
 
 
 @pytest.mark.parametrize('exclude,trailer', [(False,b''), (True,b''), (False,b'JUNK')])

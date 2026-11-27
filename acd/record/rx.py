@@ -106,8 +106,8 @@ class RxGeneric:
     @staticmethod
     def from_bytes(raw: bytes):
         raw = bytes(raw)
-        from acd.record.attribute_bounds import complete_attributes
-        bounded = complete_attributes(raw)
+        from acd.record.attribute_bounds import complete_attributes, counted_layout_enabled
+        bounded = complete_attributes(raw) if counted_layout_enabled() else None
         if len(raw) >= 82 and struct.unpack_from("<I", raw, 74)[0] == len(raw) - 74:
             parsed = GeneratedRxGeneric.from_bytes(raw)
             if bounded is not None:

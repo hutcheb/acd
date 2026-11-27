@@ -1,10 +1,34 @@
 """Validate the complete counted-attribute contract for supported Rx records.
 
-This does not infer a FAFA convention from four excess bytes. An Rx header,
-attribute count, every attribute length and the Rx length independently define
-the payload end. An opaque FAFA record is deliberately outside this contract.
+These bounds checks do not identify a layout. Inflated final-attribute lengths
+and outer trailers can mimic complete counted attributes. Recovery requires an
+explicit caller assertion of the complete-counted contract; compat is default.
+Opaque FAFA records are deliberately outside this contract.
 """
 import struct
+from contextlib import contextmanager
+from contextvars import ContextVar
+
+_LAYOUT = ContextVar('acd_rx_attribute_layout', default='compat')
+
+
+def counted_layout_enabled():
+    return _LAYOUT.get() == 'complete-counted'
+
+
+@contextmanager
+def attribute_layout(name=None):
+    """Caller assertion, not autodetection: outer trailers can mimic values."""
+    if name is None:
+        yield
+        return
+    if name not in ('compat', 'complete-counted'):
+        raise ValueError('Unknown Rx attribute layout')
+    token = _LAYOUT.set(name)
+    try:
+        yield
+    finally:
+        _LAYOUT.reset(token)
 
 
 COUNTED_TYPES = {0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x338}
